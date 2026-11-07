@@ -1,0 +1,28 @@
+{
+  "name": "eduvera-platform",
+  "version": "2.0.0",
+  "description": "EduVera - Sovereign National Student Education & Migration Registry",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm --prefix Client install",
+    "install:all": "npm --prefix Server install && npm --prefix Client install",
+    "build": "npm --prefix Client run build",
+    "start": "node Server/server.js",
+    "seed": "node Server/seed_mongodb.js",
+    "test": "node Server/test_mock_suite.js",
+    "dev:client": "npm --prefix Client run dev",
+    "dev:server": "node Server/server.js"
+  },
+  "keywords": [
+    "education",
+    "student-registry",
+    "migration",
+    "cbse",
+    "upmsp",
+    "ugc",
+    "govtech"
+  ],
+  "author": "EduVera GovTech Team",
+  "license": "ISC"
+}
+

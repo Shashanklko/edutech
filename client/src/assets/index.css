@@ -1,0 +1,167 @@
+@import 'tailwindcss';
+
+@layer base {
+  :root {
+    --gov-navy: #0f172a;
+    --gov-blue: #1e40af;
+    --gov-blue-light: #eff6ff;
+    --gov-slate: #334155;
+    --gov-border: #e2e8f0;
+    --gov-bg: #f8fafc;
+    --gov-white: #ffffff;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #0f172a;
+    background-color: #f8fafc;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: #f8fafc;
+}
+
+/* Crisp Government Portal Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Subtle Government Card Elevation */
+.gov-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
+}
+
+.gov-card-interactive {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.15s ease-in-out;
+}
+
+.gov-card-interactive:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+}
+
+/* Official Seal Watermark effect */
+.gov-seal-bg {
+  background-image: radial-gradient(#cbd5e1 0.75px, transparent 0.75px);
+  background-size: 16px 16px;
+}
+
+/* High-fidelity Print Styles for Official Certificates */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt;
+  }
+
+  header, nav, aside, footer, .no-print, button, input, .print-hide {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-card {
+    border: 2px solid #0f172a !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+    padding: 24px !important;
+  }
+}
+
+/* Floating Academic & Discipline Symbols Keyframes */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-16px) rotate(3deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(15px) rotate(-3deg);
+  }
+}
+
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  33% {
+    transform: translateY(-10px) translateX(6px);
+  }
+  66% {
+    transform: translateY(8px) translateX(-5px);
+  }
+}
+
+@keyframes float-drift {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translateY(-18px) rotate(-5deg) scale(1.05);
+  }
+}
+
+@keyframes spin-very-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 7s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 8.5s ease-in-out infinite;
+}
+
+.animate-float-gentle {
+  animation: float-gentle 9s ease-in-out infinite;
+}
+
+.animate-float-drift {
+  animation: float-drift 11s ease-in-out infinite;
+}
+
+.animate-spin-very-slow {
+  animation: spin-very-slow 24s linear infinite;
+}

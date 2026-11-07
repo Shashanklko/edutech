@@ -1,0 +1,16 @@
+{
+  "installCommand": "npm --prefix Client install",
+  "buildCommand": "npm --prefix Client run build",
+  "outputDirectory": "Client/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://student-migration-portal.onrender.com/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+
