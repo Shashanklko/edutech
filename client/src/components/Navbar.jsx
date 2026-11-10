@@ -132,11 +132,11 @@ const Navbar = () => {
                             {!user && (
                                 <nav className={`hidden md:flex items-center gap-1 pl-4 border-l ${isSolid ? "border-slate-200" : "border-slate-800"
                                     }`}>
-                                    <a href="#breakdown" className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${isSolid
+                                    <a href="#choose-dashboard" className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${isSolid
                                             ? "text-slate-700 hover:text-blue-700 hover:bg-slate-50"
                                             : "text-slate-200 hover:text-white hover:bg-slate-800/60"
                                         }`}>
-                                        Governance Breakdown
+                                        Dashboards
                                     </a>
                                     <a href="#governance" className={`text-xs font-semibold px-3 py-1.5 rounded-md transition-colors ${isSolid
                                             ? "text-slate-700 hover:text-blue-700 hover:bg-slate-50"
@@ -269,7 +269,7 @@ const Navbar = () => {
                     <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-5 space-y-3 shadow-md">
                         {!user ? (
                             <div className="space-y-1 pt-1 text-left">
-                                <a href="#breakdown" onClick={() => setIsOpen(false)} className="block px-3 py-2 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-100">Governance Breakdown</a>
+                                <a href="#choose-dashboard" onClick={() => setIsOpen(false)} className="block px-3 py-2 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-100">Dashboards</a>
                                 <a href="#governance" onClick={() => setIsOpen(false)} className="block px-3 py-2 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-100">Access Channels</a>
                                 <a href="#necessity" onClick={() => setIsOpen(false)} className="block px-3 py-2 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-100">Why EduVera</a>
                                 <a href="#services" onClick={() => setIsOpen(false)} className="block px-3 py-2 rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-100">Statutory Framework</a>
