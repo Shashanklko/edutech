@@ -19,6 +19,11 @@ const Sidebar = () => {
     const isCentralGov = (user?.tier === 'central' && !isTopAdmin) || uId === 'MOE' || uId === 'MIN-EDU';
     const canCreateInstitution = isTopAdmin || isBoard;
 
+    const isMasterOperator = user?.isMaster !== false;
+    const assignedOps = user?.assignedOperations || (isMasterOperator ? ['admissions', 'students', 'transfers', 'marks', 'tasks', 'operators'] : ['students', 'tasks']);
+    const hasAdmissions = isMasterOperator || assignedOps.includes('admissions') || assignedOps.includes('transfers');
+    const hasStudents = isMasterOperator || assignedOps.includes('students');
+
     const isAdmin = user?.role === 'admin' || user?.tier === 'central' || user?.tier === 'state' || user?.tier === 'board';
     const tier = user?.tier || (user?.schoolId?.startsWith('UNIV') ? 'university' : (user?.schoolId?.startsWith('CLG') ? 'college' : 'school'));
     const isUniversity = !isAdmin && (user?.role === 'university' || tier === 'university');
@@ -26,6 +31,9 @@ const Sidebar = () => {
     const isSchool = !isAdmin && !isUniversity && !isCollege;
 
     const getRoleBadge = () => {
+        if (!isMasterOperator) {
+            return user?.deskRole ? `${user.deskRole.split(' ')[0]} Operator` : 'Operator Desk';
+        }
         if (isAdmin) {
             if (isStateGov) return 'State Directorate (Audit)';
             if (isCentralGov) return 'Central Ministry (Audit)';
@@ -104,141 +112,159 @@ const Sidebar = () => {
                 {/* 1. School Desk Items */}
                 {isSchool && (
                     <>
-                        <NavLink
-                            to="/dashboard/admissions"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                                    isActive
-                                        ? "bg-slate-900 text-white font-bold shadow-xs"
-                                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                                }`
-                            }
-                        >
-                            <ArrowRightLeft size={15} />
-                            <span>K-12 Admissions & TC</span>
-                        </NavLink>
+                        {hasAdmissions && (
+                            <NavLink
+                                to="/dashboard/admissions"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                        isActive
+                                            ? "bg-slate-900 text-white font-bold shadow-xs"
+                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                                    }`
+                                }
+                            >
+                                <ArrowRightLeft size={15} />
+                                <span>K-12 Admissions & TC</span>
+                            </NavLink>
+                        )}
 
-                        <NavLink
-                            to="/dashboard/students"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                                    isActive
-                                        ? "bg-slate-900 text-white font-bold shadow-xs"
-                                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                                }`
-                            }
-                        >
-                            <Users size={15} />
-                            <span>Class 1-12 Roster</span>
-                        </NavLink>
+                        {hasStudents && (
+                            <NavLink
+                                to="/dashboard/students"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                        isActive
+                                            ? "bg-slate-900 text-white font-bold shadow-xs"
+                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                                    }`
+                                }
+                            >
+                                <Users size={15} />
+                                <span>Class 1-12 Roster</span>
+                            </NavLink>
+                        )}
 
-                        <NavLink
-                            to="/dashboard/schoolProfile"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                                    isActive
-                                        ? "bg-slate-900 text-white font-bold shadow-xs"
-                                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                                }`
-                            }
-                        >
-                            <School size={15} />
-                            <span>School Profile & Seal</span>
-                        </NavLink>
+                        {isMasterOperator && (
+                            <NavLink
+                                to="/dashboard/schoolProfile"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                        isActive
+                                            ? "bg-slate-900 text-white font-bold shadow-xs"
+                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                                    }`
+                                }
+                            >
+                                <School size={15} />
+                                <span>School Profile & Seal</span>
+                            </NavLink>
+                        )}
                     </>
                 )}
 
                 {/* 2. College Desk Items */}
                 {isCollege && (
                     <>
-                        <NavLink
-                            to="/dashboard/admissions"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                                    isActive
-                                        ? "bg-slate-900 text-white font-bold shadow-xs"
-                                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                                }`
-                            }
-                        >
-                            <ArrowRightLeft size={15} />
-                            <span>Degree Admissions & Migration</span>
-                        </NavLink>
+                        {hasAdmissions && (
+                            <NavLink
+                                to="/dashboard/admissions"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                        isActive
+                                            ? "bg-slate-900 text-white font-bold shadow-xs"
+                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                                    }`
+                                }
+                            >
+                                <ArrowRightLeft size={15} />
+                                <span>Degree Admissions & Migration</span>
+                            </NavLink>
+                        )}
 
-                        <NavLink
-                            to="/dashboard/students"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                                    isActive
-                                        ? "bg-slate-900 text-white font-bold shadow-xs"
-                                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                                }`
-                            }
-                        >
-                            <Users size={15} />
-                            <span>Undergraduate Registry</span>
-                        </NavLink>
+                        {hasStudents && (
+                            <NavLink
+                                to="/dashboard/students"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                        isActive
+                                            ? "bg-slate-900 text-white font-bold shadow-xs"
+                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                                    }`
+                                }
+                            >
+                                <Users size={15} />
+                                <span>Undergraduate Registry</span>
+                            </NavLink>
+                        )}
 
-                        <NavLink
-                            to="/dashboard/schoolProfile"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                                    isActive
-                                        ? "bg-slate-900 text-white font-bold shadow-xs"
-                                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                                }`
-                            }
-                        >
-                            <Building2 size={15} />
-                            <span>College Profile & Seal</span>
-                        </NavLink>
+                        {isMasterOperator && (
+                            <NavLink
+                                to="/dashboard/schoolProfile"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                        isActive
+                                            ? "bg-slate-900 text-white font-bold shadow-xs"
+                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                                    }`
+                                }
+                            >
+                                <Building2 size={15} />
+                                <span>College Profile & Seal</span>
+                            </NavLink>
+                        )}
                     </>
                 )}
 
                 {/* 3. University Desk Items */}
                 {isUniversity && (
                     <>
-                        <NavLink
-                            to="/dashboard/admissions"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                                    isActive
-                                        ? "bg-slate-900 text-white font-bold shadow-xs"
-                                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                                }`
-                            }
-                        >
-                            <ArrowRightLeft size={15} />
-                            <span>Higher Ed Admissions</span>
-                        </NavLink>
+                        {hasAdmissions && (
+                            <NavLink
+                                to="/dashboard/admissions"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                        isActive
+                                            ? "bg-slate-900 text-white font-bold shadow-xs"
+                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                                    }`
+                                }
+                            >
+                                <ArrowRightLeft size={15} />
+                                <span>Higher Ed Admissions</span>
+                            </NavLink>
+                        )}
 
-                        <NavLink
-                            to="/dashboard/students"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                                    isActive
-                                        ? "bg-slate-900 text-white font-bold shadow-xs"
-                                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                                }`
-                            }
-                        >
-                            <GraduationCap size={15} />
-                            <span>University Registry</span>
-                        </NavLink>
+                        {hasStudents && (
+                            <NavLink
+                                to="/dashboard/students"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                        isActive
+                                            ? "bg-slate-900 text-white font-bold shadow-xs"
+                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                                    }`
+                                }
+                            >
+                                <GraduationCap size={15} />
+                                <span>University Registry</span>
+                            </NavLink>
+                        )}
 
-                        <NavLink
-                            to="/dashboard/schoolProfile"
-                            className={({ isActive }) =>
-                                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                                    isActive
-                                        ? "bg-slate-900 text-white font-bold shadow-xs"
-                                        : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                                }`
-                            }
-                        >
-                            <Landmark size={15} />
-                            <span>Campus Profile & Charters</span>
-                        </NavLink>
+                        {isMasterOperator && (
+                            <NavLink
+                                to="/dashboard/schoolProfile"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                        isActive
+                                            ? "bg-slate-900 text-white font-bold shadow-xs"
+                                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                                    }`
+                                }
+                            >
+                                <Landmark size={15} />
+                                <span>Campus Profile & Charters</span>
+                            </NavLink>
+                        )}
                     </>
                 )}
 
@@ -286,20 +312,22 @@ const Sidebar = () => {
                     </>
                 )}
 
-                {/* Operator Governance (All Administrative Desks) */}
-                <NavLink
-                    to="/dashboard/operators"
-                    className={({ isActive }) =>
-                        `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
-                            isActive
-                                ? "bg-slate-900 text-white font-bold shadow-xs"
-                                : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
-                        }`
-                    }
-                >
-                    <KeyRound size={15} />
-                    <span>Operator Desks & Passkeys</span>
-                </NavLink>
+                {/* Operator Governance (ONLY Master Operators have Universal Access) */}
+                {isMasterOperator && (
+                    <NavLink
+                        to="/dashboard/operators"
+                        className={({ isActive }) =>
+                            `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs font-semibold ${
+                                isActive
+                                    ? "bg-slate-900 text-white font-bold shadow-xs"
+                                    : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
+                            }`
+                        }
+                    >
+                        <KeyRound size={15} />
+                        <span>Operator Desks & Passkeys</span>
+                    </NavLink>
+                )}
 
                 <p className="px-3 pt-4 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
                     Statutory Verification
@@ -323,9 +351,14 @@ const Sidebar = () => {
             {/* Footer / User Profile & Logout */}
             <div className="p-3 border-t border-slate-200 bg-slate-50 text-left">
                 <div className="p-2.5 rounded-xl bg-white border border-slate-200 mb-2 shadow-2xs">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">Authenticated Operator</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">
+                        {isMasterOperator ? 'Master Authority' : 'Sub-Desk Operator'}
+                    </p>
                     <p className="text-xs font-bold text-slate-900 truncate mt-0.5">{user?.name || 'Administrator'}</p>
                     <p className="text-[10px] text-blue-700 font-mono font-bold truncate">{user?.operatorId || user?.id || 'AUTH-00'}</p>
+                    {!isMasterOperator && user?.deskRole && (
+                        <p className="text-[9px] text-slate-500 font-mono mt-0.5 truncate">{user.deskRole}</p>
+                    )}
                 </div>
 
                 <button 

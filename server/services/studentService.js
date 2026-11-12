@@ -115,7 +115,16 @@ const createStudent = async (data) => {
         throw error;
     }
 
-    if (!aadhaarNumber || aadhaarNumber.trim().replace(/[-\s]/g, '').length < 12) {
+    if (phoneNumber && phoneNumber.trim()) {
+        const cleanPhone = phoneNumber.trim().replace(/\D/g, '');
+        if (cleanPhone.length !== 10) {
+            const error = new Error('Mobile number must be exactly 10 digits');
+            error.statusCode = 400;
+            throw error;
+        }
+    }
+
+    if (!aadhaarNumber || aadhaarNumber.trim().replace(/[-\s]/g, '').length !== 12) {
         const error = new Error('A valid 12-digit Aadhaar number is mandatory for national depository registration');
         error.statusCode = 400;
         throw error;
@@ -256,6 +265,24 @@ const createStudent = async (data) => {
  */
 const updateStudent = async (id, updateData) => {
     const data = { ...updateData };
+    if (data.phoneNumber && data.phoneNumber.trim()) {
+        const cleanPhone = data.phoneNumber.trim().replace(/\D/g, '');
+        if (cleanPhone.length !== 10) {
+            const error = new Error('Mobile number must be exactly 10 digits');
+            error.statusCode = 400;
+            throw error;
+        }
+        data.phoneNumber = cleanPhone;
+    }
+    if (data.aadhaarNumber && data.aadhaarNumber.trim()) {
+        const cleanAadhaar = data.aadhaarNumber.trim().replace(/\D/g, '');
+        if (cleanAadhaar.length !== 12) {
+            const error = new Error('Aadhaar number must be exactly 12 digits');
+            error.statusCode = 400;
+            throw error;
+        }
+        data.aadhaarNumber = cleanAadhaar;
+    }
     if (data.course) {
         data.currentClass = data.course;
         data.qualification = data.course;

@@ -1,14 +1,34 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
 import { 
     Users, ShieldAlert, KeyRound, UserPlus, RefreshCw, CheckCircle2, 
-    AlertCircle, Lock, Trash2, Ban, Check, ShieldCheck, Sparkles, HelpCircle 
+    AlertCircle, Lock, Trash2, Ban, Check, ShieldCheck, Sparkles, HelpCircle,
+    ArrowLeft, Phone, Mail, Award, BookOpen, Layers
 } from 'lucide-react';
+
+const getOperationsForRole = (role) => {
+    switch (role) {
+        case 'Admissions & Records Officer':
+            return ['admissions', 'students', 'tasks'];
+        case 'Academic Examination Controller':
+            return ['students', 'marks', 'tasks'];
+        case 'Transfer & TC Clearance Officer':
+            return ['students', 'transfers', 'tasks'];
+        case 'Verification & Census Desk':
+            return ['students', 'tasks'];
+        case 'IT Operations Desk':
+            return ['students', 'tasks'];
+        default:
+            return ['students', 'tasks'];
+    }
+};
 
 const OperatorManagement = () => {
     const { user } = useContext(AuthContext);
     const institutionId = user?.institutionId || user?.schoolId || user?.id || 'SCH002';
+    const isMaster = user?.isMaster !== false;
 
     const [operators, setOperators] = useState([]);
     const [resetRequests, setResetRequests] = useState([]);
@@ -22,6 +42,7 @@ const OperatorManagement = () => {
         operatorId: '',
         name: '',
         deskRole: 'Admissions & Records Officer',
+        assignedOperations: ['admissions', 'students', 'tasks'],
         email: '',
         phone: '',
         password: 'admin123'
@@ -61,13 +82,28 @@ const OperatorManagement = () => {
     // Handle Custom Operator Creation
     const handleCreateOperator = async (e) => {
         e.preventDefault();
-        setCreateLoading(true);
         setErrorMsg('');
         setSuccessMsg('');
+
+        // Strict 10-digit mobile number validation
+        const cleanPhone = createForm.phone ? createForm.phone.trim().replace(/\D/g, '') : '';
+        if (cleanPhone.length !== 10) {
+            setErrorMsg('Mobile number must be strictly 10 numeric digits.');
+            return;
+        }
+
+        if (!createForm.assignedOperations || createForm.assignedOperations.length === 0) {
+            setErrorMsg('Please select at least one assigned operation for this desk operator.');
+            return;
+        }
+
+        setCreateLoading(true);
         try {
             const res = await axios.post('/api/operators', {
                 ...createForm,
-                institutionId
+                phone: cleanPhone,
+                institutionId,
+                isMaster
             });
             setSuccessMsg(`Operator ${res.data.operator.operatorId} created and authorized successfully!`);
             setShowCreateModal(false);
@@ -75,6 +111,7 @@ const OperatorManagement = () => {
                 operatorId: '',
                 name: '',
                 deskRole: 'Admissions & Records Officer',
+                assignedOperations: ['admissions', 'students', 'tasks'],
                 email: '',
                 phone: '',
                 password: 'admin123'
@@ -104,7 +141,8 @@ const OperatorManagement = () => {
         try {
             await axios.put(`/api/operators/${resetModalOp.operatorId}/password`, {
                 institutionId,
-                newPassword: newPasswordInput
+                newPassword: newPasswordInput,
+                isMaster
             });
             setSuccessMsg(`Passcode for Operator "${resetModalOp.operatorId}" updated to "${newPasswordInput}".`);
             setResetModalOp(null);
@@ -123,7 +161,8 @@ const OperatorManagement = () => {
         try {
             const res = await axios.put(`/api/operators/reset-requests/${approveModalReq.requestId}/approve`, {
                 newPassword: approvePassInput,
-                masterAdminId: institutionId
+                masterAdminId: institutionId,
+                isMaster
             });
             setSuccessMsg(`Approved! New temporary passkey "${res.data.temporaryPassword}" issued for ${approveModalReq.operatorId}.`);
             setApproveModalReq(null);
@@ -139,7 +178,8 @@ const OperatorManagement = () => {
         try {
             await axios.put(`/api/operators/${op.operatorId}/status`, {
                 institutionId,
-                status: nextStatus
+                status: nextStatus,
+                isMaster
             });
             setSuccessMsg(`Operator ${op.operatorId} is now ${nextStatus}.`);
             fetchAllData();
@@ -152,13 +192,36 @@ const OperatorManagement = () => {
     const handleDeleteOperator = async (operatorId) => {
         if (!window.confirm(`Are you sure you want to permanently revoke Operator ID "${operatorId}"?`)) return;
         try {
-            await axios.delete(`/api/operators/${operatorId}?institutionId=${institutionId}`);
+            await axios.delete(`/api/operators/${operatorId}?institutionId=${institutionId}&isMaster=${isMaster}`);
             setSuccessMsg(`Operator ${operatorId} deleted.`);
             fetchAllData();
         } catch (err) {
             setErrorMsg(err.response?.data?.error || 'Failed to delete operator');
         }
     };
+
+    // Access Denied guard for non-master operators
+    if (!isMaster) {
+        return (
+            <div className="p-8 max-w-lg mx-auto bg-white border border-red-200 rounded-2xl shadow-xs text-center space-y-4 my-8">
+                <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+                    <ShieldAlert size={28} />
+                </div>
+                <h2 className="text-base font-bold text-slate-900">Universal Operator Access Restricted</h2>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                    Only the <strong>Master Operator</strong> has universal authority to generate sub-desk operator IDs, suspend accounts, and manage statutory passkeys.
+                </p>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-left text-xs space-y-1">
+                    <p className="font-mono text-slate-500 text-[11px]">Current Authenticated Sub-Desk:</p>
+                    <p className="font-bold text-slate-900">{user?.name} ({user?.operatorId})</p>
+                    <p className="text-blue-700 font-mono text-[10px]">Assigned Role: {user?.deskRole || 'Desk Operator'}</p>
+                </div>
+                <Link to="/dashboard" className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800">
+                    <ArrowLeft size={14} /> Back to My Assigned Workspace
+                </Link>
+            </div>
+        );
+    }
 
     const pendingRequests = resetRequests.filter(r => r.status === 'Pending');
 
@@ -333,9 +396,16 @@ const OperatorManagement = () => {
                                             {op.name}
                                         </td>
                                         <td className="py-2.5 px-3">
-                                            <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[10px]">
+                                            <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[10px] block w-fit">
                                                 {op.deskRole}
                                             </span>
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {(op.assignedOperations || ['students', 'tasks']).map((perm) => (
+                                                    <span key={perm} className="px-1.5 py-0.2 rounded bg-blue-50 border border-blue-200 text-blue-700 font-mono text-[9px] uppercase font-bold">
+                                                        {perm}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         </td>
                                         <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px]">
                                             {op.email || op.phone || 'N/A'}
@@ -445,7 +515,15 @@ const OperatorManagement = () => {
                                 <label className="block font-semibold text-slate-700 mb-1">Desk Role / Function *</label>
                                 <select
                                     value={createForm.deskRole}
-                                    onChange={(e) => setCreateForm({ ...createForm, deskRole: e.target.value })}
+                                    onChange={(e) => {
+                                        const newRole = e.target.value;
+                                        setCreateForm({
+                                            ...createForm,
+                                            deskRole: newRole,
+                                            assignedOperations: getOperationsForRole(newRole),
+                                            operatorId: suggestOperatorId(newRole)
+                                        });
+                                    }}
                                     className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-xs focus:border-blue-700 focus:bg-white"
                                 >
                                     <option value="Admissions & Records Officer">Admissions & Records Officer</option>
@@ -456,7 +534,56 @@ const OperatorManagement = () => {
                                 </select>
                             </div>
 
+                            {/* Assigned Operations Checkboxes */}
+                            <div>
+                                <label className="block font-semibold text-slate-700 mb-1">
+                                    Assigned Operations & Functional Permissions *
+                                </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                                    {[
+                                        { id: 'admissions', label: 'Admissions & Enrollment', desc: 'Can enroll fresh pupils' },
+                                        { id: 'students', label: 'Student Directory & Roster', desc: 'Can view pupil ledger' },
+                                        { id: 'transfers', label: 'Transfer & TC Clearance', desc: 'Can issue migration TCs' },
+                                        { id: 'marks', label: 'Academic Marks & Grading', desc: 'Can update marksheets' },
+                                        { id: 'tasks', label: 'Assigned Tasks & Directives', desc: 'Can resolve assigned items' }
+                                    ].map((op) => (
+                                        <label key={op.id} className="flex items-start gap-2 p-1 rounded hover:bg-white cursor-pointer text-left">
+                                            <input
+                                                type="checkbox"
+                                                checked={createForm.assignedOperations.includes(op.id)}
+                                                onChange={(e) => {
+                                                    const current = createForm.assignedOperations || [];
+                                                    const updated = e.target.checked
+                                                        ? [...current, op.id]
+                                                        : current.filter(x => x !== op.id);
+                                                    setCreateForm({ ...createForm, assignedOperations: updated });
+                                                }}
+                                                className="rounded text-blue-600 mt-0.5"
+                                            />
+                                            <div className="text-[11px] leading-tight">
+                                                <span className="font-bold text-slate-800">{op.label}</span>
+                                                <p className="text-[10px] text-slate-500">{op.desc}</p>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">
+                                        Mobile Number * <span className="text-red-600 font-bold font-mono">(10 Digits)</span>
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        required
+                                        maxLength={10}
+                                        value={createForm.phone}
+                                        onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                                        placeholder="e.g. 9876543210"
+                                        className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-xs font-mono"
+                                    />
+                                </div>
                                 <div>
                                     <label className="block font-semibold text-slate-700 mb-1">Email (Optional)</label>
                                     <input
@@ -467,17 +594,18 @@ const OperatorManagement = () => {
                                         className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-xs"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Initial Passcode *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={createForm.password}
-                                        onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                                        placeholder="admin123"
-                                        className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-xs font-mono"
-                                    />
-                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold text-slate-700 mb-1">Initial Passcode *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={createForm.password}
+                                    onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                                    placeholder="admin123"
+                                    className="w-full bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-xs font-mono"
+                                />
                             </div>
 
                             <div className="pt-2 flex justify-end gap-2 border-t border-slate-200">

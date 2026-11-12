@@ -23,6 +23,11 @@ const InstitutionDashboard = ({ stats, user, onRefresh }) => {
 
     const instType = isUniv ? 'university' : (isCollege ? 'college' : 'school');
 
+    const isMaster = user?.isMaster !== false;
+    const assignedOps = user?.assignedOperations || (isMaster ? ['admissions', 'students', 'transfers', 'marks', 'tasks', 'operators'] : ['students', 'tasks']);
+    const hasAdmissions = isMaster || assignedOps.includes('admissions') || assignedOps.includes('transfers');
+    const hasStudents = isMaster || assignedOps.includes('students');
+
     const typeDetails = isUniv ? {
         title: 'Apex University / Research Institute',
         badge: 'AISHE-U & UGC Apex',
@@ -99,75 +104,170 @@ const InstitutionDashboard = ({ stats, user, onRefresh }) => {
                 </div>
             </div>
 
+            {/* Sub-Desk Operator Active Session Notice */}
+            {!isMaster && (
+                <div className="p-4 rounded-xl bg-slate-900 text-white border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs shadow-xs">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                            <ShieldCheck size={20} />
+                        </div>
+                        <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-bold text-sm text-white">{user?.name}</span>
+                                <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[10px] border border-blue-500/30 font-bold">
+                                    {user?.operatorId}
+                                </span>
+                                <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                                    Sub-Desk Operator
+                                </span>
+                            </div>
+                            <p className="text-slate-300 text-[11px] mt-0.5">
+                                Assigned Desk Role: <strong>{user?.deskRole || 'Operational Staff'}</strong>. Universal access is restricted to Master Admin.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 self-start md:self-center">
+                        <span className="text-[10px] font-mono text-slate-400 mr-1">Permitted Operations:</span>
+                        {assignedOps.map((op) => (
+                            <span key={op} className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-400 font-mono text-[10px] font-bold">
+                                ✓ {op.toUpperCase()}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Quick Action Navigation Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Link
-                    to="/dashboard/admissions"
-                    className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col justify-between group"
-                >
-                    <div className="flex items-center justify-between">
-                        <span className="p-2 rounded-lg bg-blue-50 text-blue-700">
-                            <ArrowRightLeft size={16} />
-                        </span>
-                        <ArrowRight size={13} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
+                {hasAdmissions ? (
+                    <Link
+                        to="/dashboard/admissions"
+                        className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col justify-between group"
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="p-2 rounded-lg bg-blue-50 text-blue-700">
+                                <ArrowRightLeft size={16} />
+                            </span>
+                            <ArrowRight size={13} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
+                        </div>
+                        <div className="mt-3">
+                            <p className="text-xs font-bold text-slate-900">
+                                {isSchool ? 'Admissions & TC Hub' : 'Admissions & Migration'}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                                {isSchool ? 'Class 1-12 Single-Seat Lock' : 'Semester & ABC Admission'}
+                            </p>
+                        </div>
+                    </Link>
+                ) : (
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 opacity-60 flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                            <span className="p-2 rounded-lg bg-slate-200 text-slate-500">
+                                <ArrowRightLeft size={16} />
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-400 uppercase font-bold">Locked</span>
+                        </div>
+                        <div className="mt-3">
+                            <p className="text-xs font-bold text-slate-700">Admissions & TC</p>
+                            <p className="text-[10px] text-slate-400">Desk Permission Required</p>
+                        </div>
                     </div>
-                    <div className="mt-3">
-                        <p className="text-xs font-bold text-slate-900">
-                            {isSchool ? 'Admissions & TC Hub' : 'Admissions & Migration'}
-                        </p>
-                        <p className="text-[10px] text-slate-500">
-                            {isSchool ? 'Class 1-12 Single-Seat Lock' : 'Semester & ABC Admission'}
-                        </p>
-                    </div>
-                </Link>
+                )}
 
-                <Link
-                    to="/dashboard/students"
-                    className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col justify-between group"
-                >
-                    <div className="flex items-center justify-between">
-                        <span className="p-2 rounded-lg bg-purple-50 text-purple-700">
-                            <Users size={16} />
-                        </span>
-                        <ArrowRight size={13} className="text-slate-300 group-hover:text-purple-600 transition-colors" />
+                {hasStudents ? (
+                    <Link
+                        to="/dashboard/students"
+                        className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col justify-between group"
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="p-2 rounded-lg bg-purple-50 text-purple-700">
+                                <Users size={16} />
+                            </span>
+                            <ArrowRight size={13} className="text-slate-300 group-hover:text-purple-600 transition-colors" />
+                        </div>
+                        <div className="mt-3">
+                            <p className="text-xs font-bold text-slate-900">{typeDetails.rosterTitle}</p>
+                            <p className="text-[10px] text-slate-500">{students.length} Enrolled Profiles</p>
+                        </div>
+                    </Link>
+                ) : (
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 opacity-60 flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                            <span className="p-2 rounded-lg bg-slate-200 text-slate-500">
+                                <Users size={16} />
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-400 uppercase font-bold">Locked</span>
+                        </div>
+                        <div className="mt-3">
+                            <p className="text-xs font-bold text-slate-700">{typeDetails.rosterTitle}</p>
+                            <p className="text-[10px] text-slate-400">Desk Permission Required</p>
+                        </div>
                     </div>
-                    <div className="mt-3">
-                        <p className="text-xs font-bold text-slate-900">{typeDetails.rosterTitle}</p>
-                        <p className="text-[10px] text-slate-500">{students.length} Enrolled Profiles</p>
-                    </div>
-                </Link>
+                )}
 
-                <Link
-                    to="/dashboard/schoolProfile"
-                    className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col justify-between group"
-                >
-                    <div className="flex items-center justify-between">
-                        <span className="p-2 rounded-lg bg-emerald-50 text-emerald-700">
-                            {isUniv ? <Landmark size={16} /> : isCollege ? <GraduationCap size={16} /> : <School size={16} />}
-                        </span>
-                        <ArrowRight size={13} className="text-slate-300 group-hover:text-emerald-600 transition-colors" />
+                {isMaster ? (
+                    <Link
+                        to="/dashboard/schoolProfile"
+                        className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col justify-between group"
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="p-2 rounded-lg bg-emerald-50 text-emerald-700">
+                                {isUniv ? <Landmark size={16} /> : isCollege ? <GraduationCap size={16} /> : <School size={16} />}
+                            </span>
+                            <ArrowRight size={13} className="text-slate-300 group-hover:text-emerald-600 transition-colors" />
+                        </div>
+                        <div className="mt-3">
+                            <p className="text-xs font-bold text-slate-900">Institution Charter & Profile</p>
+                            <p className="text-[10px] text-slate-500">Official Seal & Accreditation</p>
+                        </div>
+                    </Link>
+                ) : (
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 opacity-60 flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                            <span className="p-2 rounded-lg bg-slate-200 text-slate-500">
+                                <School size={16} />
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-400 uppercase font-bold">Master Only</span>
+                        </div>
+                        <div className="mt-3">
+                            <p className="text-xs font-bold text-slate-700">Institution Charter</p>
+                            <p className="text-[10px] text-slate-400">Master Authority Only</p>
+                        </div>
                     </div>
-                    <div className="mt-3">
-                        <p className="text-xs font-bold text-slate-900">Institution Charter & Profile</p>
-                        <p className="text-[10px] text-slate-500">Official Seal & Accreditation</p>
-                    </div>
-                </Link>
+                )}
 
-                <Link
-                    to="/dashboard/operators"
-                    className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col justify-between group"
-                >
-                    <div className="flex items-center justify-between">
-                        <span className="p-2 rounded-lg bg-amber-50 text-amber-700">
-                            <KeyRound size={16} />
-                        </span>
-                        <ArrowRight size={13} className="text-slate-300 group-hover:text-amber-600 transition-colors" />
+                {isMaster ? (
+                    <Link
+                        to="/dashboard/operators"
+                        className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col justify-between group"
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="p-2 rounded-lg bg-amber-50 text-amber-700">
+                                <KeyRound size={16} />
+                            </span>
+                            <ArrowRight size={13} className="text-slate-300 group-hover:text-amber-600 transition-colors" />
+                        </div>
+                        <div className="mt-3">
+                            <p className="text-xs font-bold text-slate-900">Desk Operators & Passkeys</p>
+                            <p className="text-[10px] text-slate-500">Universal Access Console</p>
+                        </div>
+                    </Link>
+                ) : (
+                    <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                            <span className="p-2 rounded-lg bg-blue-100 text-blue-700">
+                                <KeyRound size={16} />
+                            </span>
+                            <span className="text-[9px] font-mono text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-bold uppercase">
+                                Sub-Desk
+                            </span>
+                        </div>
+                        <div className="mt-3">
+                            <p className="text-xs font-bold text-slate-900 truncate">{user?.deskRole || 'Assigned Desk'}</p>
+                            <p className="text-[10px] text-blue-700 font-mono">Role-Scoped Operator</p>
+                        </div>
                     </div>
-                    <div className="mt-3">
-                        <p className="text-xs font-bold text-slate-900">Desk Operators & Passkeys</p>
-                        <p className="text-[10px] text-slate-500">Sub-Desk Role Governance</p>
-                    </div>
-                </Link>
+                )}
             </div>
 
             {/* Institution Specific Metrics */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { 
     User, MapPin, Calendar, BookOpen, GraduationCap, ArrowLeft, Building, FileCheck, 
@@ -13,6 +13,10 @@ const StudentDetails = () => {
     const { id } = useParams();
     const { user } = useContext(AuthContext);
     const navigate = useNavigate();
+    const location = useLocation();
+
+    const isStudent = user?.role === 'student';
+    const isPublicTrack = location.pathname.startsWith('/track');
 
     const [student, setStudent] = useState(null);
     const [marks, setMarks] = useState([]);
@@ -66,7 +70,15 @@ const StudentDetails = () => {
     const [sessionFilter, setSessionFilter] = useState('all');
 
     const isHigherEd = student?.academicLevel === 'college' || student?.academicLevel === 'university' || ["Graduation", "Post Graduation", "Ph.D", "Higher Education"].includes(student?.courseType);
-    const canManageStudent = user?.role === 'admin' || user?.tier === 'central' || user?.tier === 'board' || user?.tier === 'state' || (user?.schoolId === student?.currentSchoolId || user?.id === student?.currentSchoolId || user?.institutionId === student?.currentSchoolId);
+    
+    const isMaster = user?.isMaster !== false;
+    const assignedOps = user?.assignedOperations || (isMaster ? ['admissions', 'transfers', 'students', 'marks', 'tasks', 'operators'] : ['students', 'tasks']);
+
+    const canManageBase = !isStudent && (user?.role === 'admin' || user?.tier === 'central' || user?.tier === 'board' || user?.tier === 'state' || (user?.schoolId && user?.schoolId === student?.currentSchoolId) || (user?.id && user?.id === student?.currentSchoolId) || (user?.institutionId && user?.institutionId === student?.currentSchoolId));
+
+    const canEditProfile = canManageBase && (isMaster || assignedOps.includes('admissions'));
+    const canIssueTC = canManageBase && (isMaster || assignedOps.includes('transfers'));
+    const canManageMarks = canManageBase && (isMaster || assignedOps.includes('marks'));
 
     const fetchStudentData = async () => {
         setLoading(true);
@@ -138,6 +150,22 @@ const StudentDetails = () => {
 
     const handleSaveProfile = async (e) => {
         e.preventDefault();
+        if (editForm.phoneNumber) {
+            const cleanPhone = editForm.phoneNumber.trim().replace(/\D/g, '');
+            if (cleanPhone.length !== 10) {
+                alert('Mobile number must be strictly 10 numeric digits.');
+                return;
+            }
+            editForm.phoneNumber = cleanPhone;
+        }
+        if (editForm.aadhaarNumber) {
+            const cleanAadhaar = editForm.aadhaarNumber.trim().replace(/\D/g, '');
+            if (cleanAadhaar.length !== 12) {
+                alert('Aadhaar number must be strictly 12 digits.');
+                return;
+            }
+            editForm.aadhaarNumber = cleanAadhaar;
+        }
         try {
             await axios.put(`/api/student/${student.uniqueId}`, {
                 ...editForm,
@@ -374,8 +402,8 @@ const StudentDetails = () => {
                 <AlertCircle size={32} className="text-red-500 mx-auto" />
                 <h2 className="text-base font-bold text-slate-900">Student Record Not Found</h2>
                 <p className="text-xs text-slate-600">{error || "The requested Unique Student Identifier does not exist in the registry."}</p>
-                <Link to="/dashboard" className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800">
-                    <ArrowLeft size={14} /> Back to Dashboard
+                <Link to={isStudent ? "/" : "/dashboard"} className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800">
+                    <ArrowLeft size={14} /> {isStudent ? 'Back to Portal' : 'Back to Dashboard'}
                 </Link>
             </div>
         );
@@ -386,9 +414,26 @@ const StudentDetails = () => {
             
             {/* Breadcrumb Bar */}
             <div className="flex items-center justify-between text-xs">
-                <Link to="/dashboard/students" className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 font-semibold transition-colors">
-                    <ArrowLeft size={14} /> Back to Roster
-                </Link>
+                {isStudent ? (
+                    <div className="inline-flex items-center gap-2">
+                        <Link to="/" className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 font-semibold transition-colors">
+                            <ArrowLeft size={14} /> Back to Portal
+                        </Link>
+                        <span className="text-slate-300">|</span>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-bold text-[11px] border border-blue-200">
+                            <GraduationCap size={13} className="text-blue-600" />
+                            Student Academic Depository
+                        </span>
+                    </div>
+                ) : isPublicTrack ? (
+                    <Link to="/" className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 font-semibold transition-colors">
+                        <ArrowLeft size={14} /> Back to Home
+                    </Link>
+                ) : (
+                    <Link to="/dashboard/students" className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 font-semibold transition-colors">
+                        <ArrowLeft size={14} /> Back to Roster
+                    </Link>
+                )}
                 <div className="flex items-center gap-2">
                     <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
                         {isHigherEd ? 'Higher Education Degree Schema' : 'K-12 School Schema'}
@@ -474,7 +519,7 @@ const StudentDetails = () => {
                             Print Transcript
                         </button>
 
-                        {canManageStudent && student.status === 'Active' && (
+                        {canIssueTC && student.status === 'Active' && (
                             <button
                                 onClick={() => setShowTCModal(true)}
                                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-xs font-bold text-red-300 transition-all cursor-pointer"
@@ -538,7 +583,7 @@ const StudentDetails = () => {
                             <h3 className="text-sm font-bold text-slate-900">Demographic & Educational Dossier</h3>
                             <p className="text-xs text-slate-500 mt-0.5">National student migration and academic credential attributes.</p>
                         </div>
-                        {canManageStudent && !isEditing && (
+                        {canEditProfile && !isEditing && (
                             <button
                                 onClick={() => setIsEditing(true)}
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -680,8 +725,17 @@ const StudentDetails = () => {
                                     <input type="text" value={editForm.motherName} onChange={(e) => setEditForm({...editForm, motherName: e.target.value})} className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs" />
                                 </div>
                                 <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
-                                    <input type="text" value={editForm.phoneNumber} onChange={(e) => setEditForm({...editForm, phoneNumber: e.target.value})} className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs" />
+                                    <label className="block font-semibold text-slate-700 mb-1">
+                                        Phone Number <span className="text-red-500 font-mono text-[11px]">(10 Digits)</span>
+                                    </label>
+                                    <input 
+                                        type="tel" 
+                                        maxLength={10} 
+                                        value={editForm.phoneNumber} 
+                                        onChange={(e) => setEditForm({...editForm, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10)})} 
+                                        placeholder="10-digit mobile number" 
+                                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono" 
+                                    />
                                 </div>
                                 <div>
                                     <label className="block font-semibold text-slate-700 mb-1">Email Address</label>
@@ -718,7 +772,7 @@ const StudentDetails = () => {
                             </p>
                         </div>
                         
-                        {canManageStudent && (
+                        {canManageMarks && (
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => setShowAddMarkModal(true)}
@@ -789,7 +843,7 @@ const StudentDetails = () => {
                                     <th className="py-2.5 px-4 text-center">{isHigherEd ? 'Grade Point' : 'Total Marks'}</th>
                                     <th className="py-2.5 px-4 text-center">{isHigherEd ? 'Credits' : 'Max Marks'}</th>
                                     <th className="py-2.5 px-4 text-center">Grade</th>
-                                    {canManageStudent && <th className="py-2.5 px-4 text-right">Actions</th>}
+                                    {canManageMarks && <th className="py-2.5 px-4 text-right">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -809,7 +863,7 @@ const StudentDetails = () => {
                                                 {m.grade || m.letterGrade || '-'}
                                             </span>
                                         </td>
-                                        {canManageStudent && (
+                                        {canManageMarks && (
                                             <td className="py-2.5 px-4 text-right">
                                                 <button
                                                     onClick={() => handleDeleteMark(m._id || m.id)}
@@ -825,7 +879,7 @@ const StudentDetails = () => {
 
                                 {marks.length === 0 && (
                                     <tr>
-                                        <td colSpan={canManageStudent ? 8 : 7} className="py-12 text-center text-slate-400 font-medium">
+                                        <td colSpan={canManageMarks ? 8 : 7} className="py-12 text-center text-slate-400 font-medium">
                                             No academic grade records currently recorded for this student.
                                         </td>
                                     </tr>

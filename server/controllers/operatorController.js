@@ -1,5 +1,15 @@
 const operatorService = require('../services/operatorService');
 
+const verifyMasterAccess = (req) => {
+    const isMasterBody = req.body?.isMaster;
+    const isMasterQuery = req.query?.isMaster;
+    if (isMasterBody === false || isMasterQuery === 'false') {
+        const error = new Error('Access Denied: Universal Access / Operator Governance is restricted exclusively to the Master Operator.');
+        error.statusCode = 403;
+        throw error;
+    }
+};
+
 /**
  * Get all operators under an institution / authority
  */
@@ -21,6 +31,7 @@ const getOperators = async (req, res) => {
  */
 const createOperator = async (req, res) => {
     try {
+        verifyMasterAccess(req);
         const operator = await operatorService.createOperator(req.body);
         res.status(201).json({
             message: `Operator ${operator.operatorId} generated successfully`,
@@ -36,6 +47,7 @@ const createOperator = async (req, res) => {
  */
 const resetPassword = async (req, res) => {
     try {
+        verifyMasterAccess(req);
         const { id } = req.params; // operatorId
         const { institutionId, newPassword } = req.body;
         const result = await operatorService.resetOperatorPassword(id, institutionId, newPassword);
@@ -50,6 +62,7 @@ const resetPassword = async (req, res) => {
  */
 const toggleStatus = async (req, res) => {
     try {
+        verifyMasterAccess(req);
         const { id } = req.params;
         const { institutionId, status } = req.body;
         const result = await operatorService.toggleOperatorStatus(id, institutionId, status);
@@ -64,6 +77,7 @@ const toggleStatus = async (req, res) => {
  */
 const deleteOperator = async (req, res) => {
     try {
+        verifyMasterAccess(req);
         const { id } = req.params;
         const institutionId = req.query.institutionId;
         const result = await operatorService.deleteOperator(id, institutionId);

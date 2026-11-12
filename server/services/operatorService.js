@@ -2,6 +2,26 @@ const Operator = require('../models/Operator');
 const PasswordResetRequest = require('../models/PasswordResetRequest');
 const School = require('../models/School');
 
+/**
+ * Default operations/permissions mapped to standard desk roles
+ */
+const getRoleDefaultOperations = (deskRole) => {
+    switch (deskRole) {
+        case 'Admissions & Records Officer':
+            return ['admissions', 'students', 'tasks'];
+        case 'Academic Examination Controller':
+            return ['students', 'marks', 'tasks'];
+        case 'Transfer & TC Clearance Officer':
+            return ['students', 'transfers', 'tasks'];
+        case 'Verification & Census Desk':
+            return ['students', 'tasks'];
+        case 'IT Operations Desk':
+            return ['students', 'tasks'];
+        default:
+            return ['students', 'tasks'];
+    }
+};
+
 // Default initial operator templates for auto-seeding if an institution has no operators in DB yet
 const defaultOperatorTemplates = {
     'SCH001': [
@@ -83,6 +103,7 @@ const ensureInitialOperators = async (institutionId) => {
                 tier: t.tier || (instId.startsWith('UNIV') ? 'university' : 'school'),
                 name: t.name,
                 deskRole: t.deskRole,
+                assignedOperations: getRoleDefaultOperations(t.deskRole),
                 password: 'admin123',
                 status: 'Active',
                 createdBy: 'Master Admin'
@@ -111,12 +132,23 @@ const getOperatorsByInstitution = async (institutionId) => {
  * @param {Object} data 
  */
 const createOperator = async (data) => {
-    let { operatorId, institutionId, name, email, phone, deskRole, password, tier } = data;
+    let { operatorId, institutionId, name, email, phone, deskRole, password, tier, assignedOperations } = data;
 
     if (!institutionId || !name) {
         const error = new Error('Institution ID and Operator Name are required');
         error.statusCode = 400;
         throw error;
+    }
+
+    // Validate phone number: strictly 10 digits
+    if (phone && phone.trim()) {
+        const cleanPhone = phone.trim().replace(/\D/g, '');
+        if (cleanPhone.length !== 10) {
+            const error = new Error('Mobile number must be exactly 10 digits');
+            error.statusCode = 400;
+            throw error;
+        }
+        phone = cleanPhone;
     }
 
     const cleanInstId = institutionId.toUpperCase().trim();
@@ -145,6 +177,11 @@ const createOperator = async (data) => {
         else tier = 'school';
     }
 
+    const cleanDeskRole = deskRole ? deskRole.trim() : 'Desk Operator';
+    const cleanOperations = Array.isArray(assignedOperations) && assignedOperations.length > 0
+        ? assignedOperations
+        : getRoleDefaultOperations(cleanDeskRole);
+
     const operator = new Operator({
         operatorId,
         institutionId: cleanInstId,
@@ -152,7 +189,8 @@ const createOperator = async (data) => {
         name: name.trim(),
         email: email ? email.trim() : '',
         phone: phone ? phone.trim() : '',
-        deskRole: deskRole ? deskRole.trim() : 'Desk Operator',
+        deskRole: cleanDeskRole,
+        assignedOperations: cleanOperations,
         password: password ? password.trim() : 'admin123',
         status: 'Active',
         createdBy: 'Master Admin'

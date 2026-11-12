@@ -56,9 +56,10 @@ const SchoolProfile = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+        const finalValue = name === 'phone' ? value.replace(/\D/g, '').slice(0, 10) : value;
         setProfile(prev => ({
             ...prev,
-            [name]: value
+            [name]: finalValue
         }));
     };
 
@@ -67,6 +68,13 @@ const SchoolProfile = () => {
         setSaving(true);
         setMessage('');
         setError('');
+
+        if (profile.phone && profile.phone.trim().replace(/\D/g, '').length !== 10) {
+            setError('Official phone number must be strictly 10 digits.');
+            setSaving(false);
+            return;
+        }
+
         try {
             await axios.put(`/api/schools/${targetSchoolId}`, profile);
             setMessage("Institution profile details updated successfully!");
@@ -236,14 +244,17 @@ const SchoolProfile = () => {
                         </div>
 
                         <div>
-                            <label className="block font-semibold text-slate-700 mb-1">Official Phone Number</label>
+                            <label className="block font-semibold text-slate-700 mb-1">
+                                Official Phone Number <span className="text-red-500 font-mono text-[11px]">(10 Digits)</span>
+                            </label>
                             <input 
-                                type="text" 
+                                type="tel" 
+                                maxLength={10}
                                 name="phone"
                                 value={profile.phone} 
                                 onChange={handleChange}
-                                placeholder="+91 11 2786 4401"
-                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-blue-600"
+                                placeholder="10-digit mobile number"
+                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-blue-600 font-mono"
                             />
                         </div>
 

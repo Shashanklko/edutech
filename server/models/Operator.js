@@ -49,6 +49,11 @@ const operatorSchema = new mongoose.Schema({
         enum: ['Active', 'Suspended'],
         default: 'Active'
     },
+    assignedOperations: {
+        type: [String],
+        enum: ['admissions', 'students', 'transfers', 'marks', 'tasks'],
+        default: ['students', 'tasks']
+    },
     createdBy: {
         type: String,
         default: 'Master Admin'

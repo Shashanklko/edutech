@@ -181,6 +181,13 @@ const LandingPage = () => {
     const handleOperatorResetSubmit = async (e) => {
         e.preventDefault();
         setResetError("");
+
+        const contact = (resetForm.requesterContact || "").trim();
+        if (contact && /^\d+$/.test(contact) && contact.length !== 10) {
+            setResetError("Mobile contact number must be strictly 10 digits.");
+            return;
+        }
+
         setResetLoading(true);
         try {
             const res = await axios.post("/api/operators/reset-request", resetForm);

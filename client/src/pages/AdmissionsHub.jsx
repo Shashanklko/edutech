@@ -61,7 +61,13 @@ const AdmissionsHub = () => {
 
     // HARD LOCK: School operators are strictly 'school'. College & University operators are strictly 'higher_ed'.
     const institutionMode = isAdmin ? adminSelectedMode : (isSchool ? 'school' : 'higher_ed');
-    const [activeTab, setActiveTab] = useState('transfer'); // 'transfer' or 'fresh'
+
+    const isMaster = user?.isMaster !== false;
+    const assignedOps = user?.assignedOperations || (isMaster ? ['admissions', 'transfers', 'students', 'marks', 'tasks', 'operators'] : ['students', 'tasks']);
+    const canDoFresh = isMaster || assignedOps.includes('admissions');
+    const canDoTransfer = isMaster || assignedOps.includes('transfers');
+
+    const [activeTab, setActiveTab] = useState(canDoTransfer ? 'transfer' : (canDoFresh ? 'fresh' : 'none'));
 
     // Transfer-In State
     const [searchQuery, setSearchQuery] = useState('');
@@ -222,8 +228,19 @@ const AdmissionsHub = () => {
         setFreshError('');
         setFreshSuccess(null);
 
+        if (!canDoFresh) {
+            setFreshError('Access Denied: Student admissions operations are not assigned to your desk account. Contact Master Admin.');
+            return;
+        }
+
         if (!freshForm.aadhaarNumber || freshForm.aadhaarNumber.length !== 12) {
             setFreshError('A valid 12-digit Aadhaar number is mandatory for national sovereign depository verification.');
+            return;
+        }
+
+        const cleanPhone = freshForm.phoneNumber ? freshForm.phoneNumber.trim().replace(/\D/g, '') : '';
+        if (cleanPhone.length !== 10) {
+            setFreshError('A valid 10-digit mobile number is mandatory for statutory registration.');
             return;
         }
 
@@ -360,29 +377,39 @@ const AdmissionsHub = () => {
             {/* Active Operation Navigation Bar */}
             <div className="flex items-center justify-between border-b border-slate-200">
                 <div className="flex gap-2">
-                    <button
-                        onClick={() => setActiveTab('transfer')}
-                        className={`flex items-center gap-2 py-3 px-5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-                            activeTab === 'transfer'
-                                ? 'border-blue-600 text-blue-600'
-                                : 'border-transparent text-slate-500 hover:text-slate-800'
-                        }`}
-                    >
-                        <ArrowRightLeft size={15} />
-                        Admit Transferred Student (TC Clearance Verification)
-                    </button>
+                    {canDoTransfer && (
+                        <button
+                            onClick={() => setActiveTab('transfer')}
+                            className={`flex items-center gap-2 py-3 px-5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                                activeTab === 'transfer'
+                                    ? 'border-blue-600 text-blue-600'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <ArrowRightLeft size={15} />
+                            Admit Transferred Student (TC Clearance Verification)
+                        </button>
+                    )}
 
-                    <button
-                        onClick={() => setActiveTab('fresh')}
-                        className={`flex items-center gap-2 py-3 px-5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-                            activeTab === 'fresh'
-                                ? 'border-blue-600 text-blue-600'
-                                : 'border-transparent text-slate-500 hover:text-slate-800'
-                        }`}
-                    >
-                        <UserPlus size={15} />
-                        Fresh Student Ledger Enrollment (New L-USI)
-                    </button>
+                    {canDoFresh && (
+                        <button
+                            onClick={() => setActiveTab('fresh')}
+                            className={`flex items-center gap-2 py-3 px-5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                                activeTab === 'fresh'
+                                    ? 'border-blue-600 text-blue-600'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <UserPlus size={15} />
+                            Fresh Student Ledger Enrollment (New L-USI)
+                        </button>
+                    )}
+
+                    {!canDoTransfer && !canDoFresh && (
+                        <span className="py-3 px-2 text-xs font-bold text-red-600 font-mono">
+                            ⚠ No Admission or Transfer operations assigned to this desk account.
+                        </span>
+                    )}
                 </div>
 
                 <span className="text-[11px] font-mono font-bold text-slate-500 hidden sm:inline-block">
@@ -799,14 +826,17 @@ const AdmissionsHub = () => {
                             </h3>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">Contact Phone Number *</label>
+                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                        Contact Phone Number * <span className="text-red-500 font-bold font-mono">(10 Digits)</span>
+                                    </label>
                                     <input 
                                         type="tel" 
                                         required 
+                                        maxLength={10}
                                         value={freshForm.phoneNumber} 
-                                        onChange={(e) => setFreshForm({...freshForm, phoneNumber: e.target.value})} 
-                                        placeholder="+91 98765 43210" 
-                                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-blue-600"
+                                        onChange={(e) => setFreshForm({...freshForm, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 10)})} 
+                                        placeholder="10-digit mobile number" 
+                                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-blue-600 font-mono"
                                     />
                                 </div>
 

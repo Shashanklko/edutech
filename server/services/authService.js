@@ -65,6 +65,13 @@ const loginUser = async (credentials, explicitPassword) => {
                                      (loginId.includes('WB') || op.operatorId.includes('WB')) ? 'West Bengal' :
                                      (loginId.includes('MH') || op.operatorId.includes('MH')) ? 'Maharashtra' : undefined;
 
+                const allowedOps = (op.assignedOperations && op.assignedOperations.length > 0)
+                    ? op.assignedOperations
+                    : (op.deskRole === 'Admissions & Records Officer' ? ['admissions', 'students', 'tasks'] :
+                       op.deskRole === 'Academic Examination Controller' ? ['students', 'marks', 'tasks'] :
+                       op.deskRole === 'Transfer & TC Clearance Officer' ? ['students', 'transfers', 'tasks'] :
+                       ['students', 'tasks']);
+
                 return {
                     id: loginId,
                     role: roleType,
@@ -72,6 +79,7 @@ const loginUser = async (credentials, explicitPassword) => {
                     operatorName: op.name,
                     operatorId: op.operatorId,
                     deskRole: op.deskRole,
+                    assignedOperations: allowedOps,
                     isMaster: false,
                     schoolId: loginId,
                     tier: op.tier,
@@ -95,13 +103,15 @@ const loginUser = async (credentials, explicitPassword) => {
                                  loginId.includes('WB') ? 'West Bengal' :
                                  loginId.includes('MH') ? 'Maharashtra' : undefined;
 
+            const isMasterLogin = !cleanOpId || cleanOpId === 'MASTER' || cleanOpId === `OP-${loginId}-01`;
             return {
                 id: loginId,
                 role: auth.role,
                 name: `${auth.name} (Master Admin)`,
                 tier: auth.tier,
                 operatorId: cleanOpId || `OP-${loginId}-01`,
-                isMaster: !cleanOpId || cleanOpId === 'MASTER' || cleanOpId === `OP-${loginId}-01`,
+                isMaster: isMasterLogin,
+                assignedOperations: isMasterLogin ? ['admissions', 'students', 'transfers', 'marks', 'tasks', 'operators'] : ['students', 'tasks'],
                 authorityCode: loginId,
                 institutionId: loginId,
                 state: derivedState
@@ -131,6 +141,7 @@ const loginUser = async (credentials, explicitPassword) => {
                 schoolId: baseSchoolId,
                 operatorId: cleanOpId || `OP-${baseSchoolId}`,
                 isMaster: true,
+                assignedOperations: ['admissions', 'students', 'transfers', 'marks', 'tasks', 'operators'],
                 tier: instTier,
                 institutionId: baseSchoolId
             };
@@ -145,13 +156,15 @@ const loginUser = async (credentials, explicitPassword) => {
     const directSchool = await School.findById(loginId);
     if (directSchool && (password === 'admin123' || password === 'SCHAdmin')) {
         const instTier = directSchool.institutionType || (directSchool._id.startsWith('UNIV') || directSchool._id.includes('IIT') ? 'university' : (directSchool._id.startsWith('CLG') ? 'college' : 'school'));
+        const isMasterSchool = !cleanOpId || cleanOpId === 'MASTER' || cleanOpId === `OP-${directSchool._id}`;
         return {
             id: directSchool._id,
             role: 'school',
             name: `${directSchool.name} (Master Admin)`,
             schoolId: directSchool._id,
             operatorId: cleanOpId || `OP-${directSchool._id}`,
-            isMaster: !cleanOpId || cleanOpId === 'MASTER' || cleanOpId === `OP-${directSchool._id}`,
+            isMaster: isMasterSchool,
+            assignedOperations: isMasterSchool ? ['admissions', 'students', 'transfers', 'marks', 'tasks', 'operators'] : ['students', 'tasks'],
             tier: instTier,
             institutionId: directSchool._id,
             state: directSchool.state

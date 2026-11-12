@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
     CheckCircle2, Clock, AlertCircle, Filter, ArrowUpRight, 
     RefreshCw, Check, X, ShieldAlert, FileText, ChevronRight,
     User, Calendar, Flag
 } from 'lucide-react';
 import axios from 'axios';
+import { AuthContext } from '../../context/AuthContext';
 
 const TaskManagementHub = ({ tier, assignedTo, title = "Administrative Tasks & Approvals" }) => {
+    const { user } = useContext(AuthContext);
+    const isMaster = user?.isMaster !== false;
+    const canManageTasks = isMaster || (user?.assignedOperations && user.assignedOperations.includes('tasks'));
+
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('All');
@@ -41,12 +46,21 @@ const TaskManagementHub = ({ tier, assignedTo, title = "Administrative Tasks & A
         e.preventDefault();
         if (!actionModal.task || !actionModal.newStatus) return;
 
+        if (actionModal.newStatus === 'Completed' && !actionModal.remarks.trim()) {
+            alert('Mandatory Requirement: Please provide resolution remarks and audit justification to mark this directive as Completed.');
+            return;
+        }
+
         setSubmitting(true);
         try {
+            const operatorIdentifier = user?.operatorId 
+                ? `${user.operatorId} (${user.operatorName || user.name})` 
+                : (user?.name || assignedTo || 'Administrative Desk');
+
             await axios.put(`/api/tasks/${actionModal.task.taskId}`, {
                 status: actionModal.newStatus,
-                remarks: actionModal.remarks,
-                updatedBy: `${assignedTo || 'Administrative Desk'}`
+                remarks: actionModal.remarks.trim(),
+                updatedBy: operatorIdentifier
             });
             setActionModal({ open: false, task: null, newStatus: '', remarks: '' });
             fetchTasks();
@@ -188,7 +202,7 @@ const TaskManagementHub = ({ tier, assignedTo, title = "Administrative Tasks & A
 
                             {/* Action Buttons */}
                             <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                                {task.status !== 'Completed' && (
+                                {task.status !== 'Completed' && canManageTasks && (
                                     <>
                                         <button
                                             onClick={() => setActionModal({ open: true, task, newStatus: 'In Progress', remarks: '' })}
@@ -203,6 +217,11 @@ const TaskManagementHub = ({ tier, assignedTo, title = "Administrative Tasks & A
                                             <Check size={12} /> Resolve
                                         </button>
                                     </>
+                                )}
+                                {task.status !== 'Completed' && !canManageTasks && (
+                                    <span className="text-slate-400 text-[10px] font-mono italic">
+                                        View Only (Task Action Desk Restricted)
+                                    </span>
                                 )}
                                 {task.status === 'Completed' && (
                                     <span className="text-emerald-700 text-xs font-bold flex items-center gap-1 font-mono">
