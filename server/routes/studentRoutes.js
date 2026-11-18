@@ -14,15 +14,20 @@ router.get('/student/:id/eligibility', studentController.checkEnrollmentEligibil
 router.get('/students/:id/eligibility', studentController.checkEnrollmentEligibility);
 router.post('/student/:id/transfer', studentController.issueTransferCertificate);
 router.post('/student/:id/enroll', studentController.enrollStudent);
+router.put('/student/:id/dropout-investigation', studentController.updateDropoutInvestigation);
+router.post('/students/auto-promote', studentController.autoPromoteStudents);
 
 // Third-Party Agency Verification Requests (Routed to Central Education Board)
 router.post('/agency-requests', studentController.createAgencyRequest);
 router.get('/agency-requests', studentController.getAgencyRequests);
 router.put('/agency-requests/:id/review', studentController.reviewAgencyRequest);
 
-// Student Academic Marks
+// Student Academic Marks & Promotion
 router.get('/student/:id/marks', studentController.getMarks);
 router.post('/student/:id/marks', studentController.addMark);
+router.put('/student/:id/marks/:markId', studentController.updateMark);
 router.delete('/student/:id/marks/:markId', studentController.deleteMark);
+router.post('/student/:id/promote', studentController.promoteStudent);
+router.post('/students/:id/promote', studentController.promoteStudent);
 
 module.exports = router;

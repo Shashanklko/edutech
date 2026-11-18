@@ -164,6 +164,7 @@ const AdmissionsHub = () => {
             if (res.data && res.data.student) {
                 setSearchedStudent({
                     ...res.data.student,
+                    status: res.data.student.status || res.data.status,
                     eligibilityStatus: res.data.status,
                     eligibilityMessage: res.data.message,
                     eligible: res.data.eligible
@@ -182,6 +183,11 @@ const AdmissionsHub = () => {
     const handleExecuteTransfer = async (e) => {
         e.preventDefault();
         if (!searchedStudent) return;
+
+        if (!canDoTransfer) {
+            alert('Access Denied: Transfer operations are not assigned to your desk account. Contact Master Admin.');
+            return;
+        }
 
         try {
             const schoolId = user?.schoolId || user?.institutionId || user?.id;
@@ -472,15 +478,15 @@ const AdmissionsHub = () => {
                             
                             {/* Clearance Banner */}
                             <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                                searchedStudent.status === 'Transferred'
+                                searchedStudent.status === 'Transferred' || searchedStudent.eligible || searchedStudent.eligibilityStatus === 'Transferred'
                                     ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
                                     : 'bg-amber-50 border-amber-200 text-amber-900'
                             }`}>
                                 <div className="flex items-start sm:items-center gap-3">
-                                    <ShieldCheck size={20} className={searchedStudent.status === 'Transferred' ? 'text-emerald-600' : 'text-amber-600'} />
+                                    <ShieldCheck size={20} className={searchedStudent.status === 'Transferred' || searchedStudent.eligible || searchedStudent.eligibilityStatus === 'Transferred' ? 'text-emerald-600' : 'text-amber-600'} />
                                     <div>
                                         <p className="font-bold text-xs uppercase tracking-wide">
-                                            {searchedStudent.status === 'Transferred' ? 'Official TC Clearance Verified' : 'Single-Active Institution Lock'}
+                                            {searchedStudent.status === 'Transferred' || searchedStudent.eligible || searchedStudent.eligibilityStatus === 'Transferred' ? 'Official TC Clearance Verified' : 'Single-Active Institution Lock'}
                                         </p>
                                         <p className="text-xs mt-0.5 leading-relaxed font-medium">
                                             {searchedStudent.eligibilityMessage}
@@ -488,9 +494,9 @@ const AdmissionsHub = () => {
                                     </div>
                                 </div>
                                 <span className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold self-start sm:self-auto uppercase border ${
-                                    searchedStudent.status === 'Transferred' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'
+                                    searchedStudent.status === 'Transferred' || searchedStudent.eligible || searchedStudent.eligibilityStatus === 'Transferred' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-amber-100 text-amber-800 border-amber-300'
                                 }`}>
-                                    Status: {searchedStudent.status}
+                                    Status: {searchedStudent.status || searchedStudent.eligibilityStatus || (searchedStudent.eligible ? 'Transferred' : 'Active')}
                                 </span>
                             </div>
 
@@ -524,7 +530,7 @@ const AdmissionsHub = () => {
                             </div>
 
                             {/* Destination Enrollment Form */}
-                            {searchedStudent.status === 'Transferred' ? (
+                            {(searchedStudent.status === 'Transferred' || searchedStudent.eligible || searchedStudent.eligibilityStatus === 'Transferred') ? (
                                 <form onSubmit={handleExecuteTransfer} className="space-y-4 pt-4 border-t border-slate-200">
                                     <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
                                         <GraduationCap size={16} className="text-blue-600" />

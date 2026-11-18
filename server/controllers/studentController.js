@@ -121,6 +121,30 @@ const deleteMark = async (req, res) => {
 };
 
 /**
+ * Rectify / Update an existing academic mark record
+ */
+const updateMark = async (req, res) => {
+    try {
+        const result = await studentService.updateStudentMark(req.params.id, req.params.markId, req.body);
+        res.json({ message: 'Mark rectified successfully', ...result });
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+/**
+ * Promote student to next standard or graduate Class 12 with Transfer Certificate (TC)
+ */
+const promoteStudent = async (req, res) => {
+    try {
+        const student = await studentService.promoteStudent(req.params.id, req.body);
+        res.json({ message: 'Student academic progression certified successfully', student });
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+/**
  * Check if a student is eligible for enrollment in a new institution
  */
 const checkEnrollmentEligibility = async (req, res) => {
@@ -168,6 +192,31 @@ const reviewAgencyRequest = async (req, res) => {
     }
 };
 
+/**
+ * Update BEO dropout investigation or resolve case
+ */
+const updateDropoutInvestigation = async (req, res) => {
+    try {
+        const student = await studentService.updateDropoutInvestigation(req.params.id, req.body);
+        res.json({ message: 'Dropout investigation updated successfully', student });
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
+/**
+ * Trigger batch auto-promotion for K-12 students
+ */
+const autoPromoteStudents = async (req, res) => {
+    try {
+        const academicProgressionService = require('../services/academicProgressionService');
+        const result = await academicProgressionService.autoPromoteAllStudents();
+        res.json({ message: 'Annual class progression synchronized', ...result });
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     getAllStudents,
     searchStudents,
@@ -178,10 +227,14 @@ module.exports = {
     enrollStudent,
     getMarks,
     addMark,
+    updateMark,
     deleteMark,
+    promoteStudent,
     checkEnrollmentEligibility,
     createAgencyRequest,
     getAgencyRequests,
-    reviewAgencyRequest
+    reviewAgencyRequest,
+    updateDropoutInvestigation,
+    autoPromoteStudents
 };
 

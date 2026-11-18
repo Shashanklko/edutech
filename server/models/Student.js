@@ -94,6 +94,16 @@ const markSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    // Class standard tag for marksheet (e.g. 'Class 10')
+    classLevel: {
+        type: String,
+        default: null
+    },
+    // Flags whether this mark belongs to a concluded previous class
+    isPreviousClass: {
+        type: Boolean,
+        default: false
+    },
     createdAt: { 
         type: Date, 
         default: Date.now 
@@ -168,6 +178,29 @@ const studentSchema = new mongoose.Schema({
         type: String, 
         default: null 
     }, // e.g. 'Class 10', 'Class 12'
+    previousClass: {
+        type: String,
+        default: null
+    }, // e.g. 'Class 10' when promoted to 'Class 11'
+    currentAcademicSession: {
+        type: String,
+        default: null
+    }, // e.g. '2025-2026' or '2026-2027'
+    lastPromotionDate: {
+        type: Date,
+        default: null
+    },
+    nextPromotionDate: {
+        type: Date,
+        default: null
+    },
+    promotionHistory: [{
+        fromClass: String,
+        toClass: String,
+        academicSession: String,
+        promotedAt: { type: Date, default: Date.now },
+        note: String
+    }],
     section: {
         type: String,
         default: 'A'
@@ -284,6 +317,29 @@ const studentSchema = new mongoose.Schema({
     reasonForLeaving: { type: String, default: null },
     academicAchievements: { type: String, default: null },
     extracurricularActivities: { type: String, default: null },
+
+    // Retention & BEO Dropout Investigation Radar
+    dropoutInvestigationStatus: {
+        type: String,
+        enum: ['Pending', 'Assigned_BEO', 'Resolved', 'Enrolled'],
+        default: 'Pending'
+    },
+    assignedBEO: {
+        type: String,
+        default: null
+    },
+    dropoutInvestigationNotes: {
+        type: String,
+        default: null
+    },
+    dropoutResolvedAt: {
+        type: Date,
+        default: null
+    },
+    dropoutResolvedBy: {
+        type: String,
+        default: null
+    },
 
     // Embedded Timeline & Marksheets
     history: [historySchema],

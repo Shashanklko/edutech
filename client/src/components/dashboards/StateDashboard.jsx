@@ -64,6 +64,75 @@ const StateDashboard = ({ stats, user, onRefresh }) => {
     const [submittingReport, setSubmittingReport] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState('');
 
+    // BEO Dropout Investigation State
+    const [beoModal, setBeoModal] = useState({ open: false, alarm: null, assignedBEO: '', notes: '', actionType: 'assign' });
+    const [actionLoading, setActionLoading] = useState(false);
+    const [actionFeedback, setActionFeedback] = useState('');
+
+    const handleOpenBeoModal = (alm, actionType = 'assign') => {
+        const defaultBEO = alm.address?.toLowerCase().includes('lucknow')
+            ? 'BEO - Lucknow Central Block'
+            : alm.address?.toLowerCase().includes('noida')
+                ? 'BEO - Gautam Buddh Nagar East Block'
+                : alm.address?.toLowerCase().includes('varanasi')
+                    ? 'BEO - Varanasi Cantonment Block'
+                    : 'BEO - District Retention Unit';
+        
+        setBeoModal({
+            open: true,
+            alarm: alm,
+            assignedBEO: alm.assignedBEO || defaultBEO,
+            notes: actionType === 'resolve' 
+                ? 'Field verification completed. Student admission confirmed in target institution.'
+                : `Conduct physical home inspection at ${alm.address || 'recorded residence'} to verify admission status for floating TC #${alm.tcNumber}.`,
+            actionType
+        });
+    };
+
+    const handleSaveBeoAction = async (e) => {
+        e.preventDefault();
+        if (!beoModal.alarm) return;
+        setActionLoading(true);
+        setActionFeedback('');
+
+        const studentId = beoModal.alarm.studentId;
+        const isResolve = beoModal.actionType === 'resolve';
+
+        try {
+            await axios.put(`/api/student/${studentId}/dropout-investigation`, {
+                status: isResolve ? 'Resolved' : 'Assigned_BEO',
+                assignedBEO: beoModal.assignedBEO,
+                notes: beoModal.notes,
+                resolvedBy: `${user?.name || 'State Directorate Officer'}`
+            });
+
+            if (isResolve) {
+                // If status or review is marked done or resolved, remove it from active radar!
+                setDropoutAlarms(prev => prev.filter(a => a.studentId !== studentId));
+                setActionFeedback(`Success: Case for ${beoModal.alarm.name} (${studentId}) marked DONE & RESOLVED. Record removed from active investigation radar.`);
+            } else {
+                setDropoutAlarms(prev => prev.map(a => {
+                    if (a.studentId === studentId) {
+                        return {
+                            ...a,
+                            dropoutInvestigationStatus: 'Assigned_BEO',
+                            assignedBEO: beoModal.assignedBEO,
+                            dropoutInvestigationNotes: beoModal.notes
+                        };
+                    }
+                    return a;
+                }));
+                setActionFeedback(`Success: BEO Field Investigation directive assigned to ${beoModal.assignedBEO} for ${beoModal.alarm.name}. Task added to District Roster.`);
+            }
+
+            setBeoModal({ open: false, alarm: null, assignedBEO: '', notes: '', actionType: 'assign' });
+        } catch (err) {
+            alert(err.response?.data?.error || err.response?.data?.message || 'Failed to update investigation');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const fetchStateData = async () => {
         setLoading(true);
         try {
@@ -319,6 +388,18 @@ const StateDashboard = ({ stats, user, onRefresh }) => {
                         <span className="text-xs font-mono text-amber-700 font-bold">{dropoutAlarms.length} Discharged TCs Under Tracking</span>
                     </div>
 
+                    {actionFeedback && (
+                        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between font-bold">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                                <span>{actionFeedback}</span>
+                            </div>
+                            <button onClick={() => setActionFeedback('')} className="text-slate-400 hover:text-slate-700 cursor-pointer">
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
+
                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
                         <AlertTriangle size={16} className="text-amber-700 shrink-0" />
                         <span>
@@ -328,7 +409,7 @@ const StateDashboard = ({ stats, user, onRefresh }) => {
 
                     {dropoutAlarms.length === 0 ? (
                         <div className="py-12 text-center text-slate-400 font-medium text-xs">
-                            No unadmitted student transition alarms active in state jurisdiction.
+                            No unadmitted student transition alarms active in state jurisdiction. All cases verified or resolved.
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -349,6 +430,11 @@ const StateDashboard = ({ stats, user, onRefresh }) => {
                                             }`}>
                                                 {alm.daysElapsed} Days Floating TC
                                             </span>
+                                            {alm.dropoutInvestigationStatus === 'Assigned_BEO' && (
+                                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border uppercase bg-blue-50 text-blue-800 border-blue-200">
+                                                    BEO Assigned: {alm.assignedBEO || 'Field Unit'}
+                                                </span>
+                                            )}
                                             <span className="text-[10px] text-slate-500 font-mono">
                                                 TC #{alm.tcNumber}
                                             </span>
@@ -364,19 +450,143 @@ const StateDashboard = ({ stats, user, onRefresh }) => {
                                             <span>Residence: {alm.address || 'Address on TC record'}</span>
                                             <span>Contact: {alm.phoneNumber || 'N/A'}</span>
                                         </div>
+                                        {alm.dropoutInvestigationNotes && (
+                                            <p className="text-[10px] text-blue-700 font-mono pt-0.5 italic">
+                                                Investigation Directive: {alm.dropoutInvestigationNotes}
+                                            </p>
+                                        )}
                                     </div>
 
-                                    {/* Action Button: Assign BEO Field Inspection */}
-                                    <div className="flex items-center gap-2 shrink-0">
+                                    {/* Action Buttons: Assign BEO & Mark Done / Resolve */}
+                                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                                         <button
-                                            onClick={() => alert(`BEO Field Investigation Directive assigned for student ${alm.studentId} (${alm.name}). Task added to District Roster.`)}
+                                            onClick={() => handleOpenBeoModal(alm, 'assign')}
                                             className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
                                         >
-                                            <UserCheck size={12} /> Assign BEO Investigation
+                                            <UserCheck size={12} /> {alm.dropoutInvestigationStatus === 'Assigned_BEO' ? 'Update Directive' : 'Assign BEO Investigation'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleOpenBeoModal(alm, 'resolve')}
+                                            className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                                        >
+                                            <CheckCircle2 size={12} /> Mark Done / Resolve
                                         </button>
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {/* BEO INVESTIGATION & RESOLUTION MODAL */}
+                    {beoModal.open && beoModal.alarm && (
+                        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl max-w-lg w-full p-5 border border-slate-200 shadow-xl space-y-4 text-left">
+                                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                                    <div>
+                                        <span className="text-[10px] font-mono font-bold uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                            {beoModal.actionType === 'resolve' ? 'Case Resolution Desk' : 'BEO Field Task Directive'}
+                                        </span>
+                                        <h3 className="text-sm font-bold text-slate-900 mt-1">
+                                            {beoModal.actionType === 'resolve' ? 'Mark Investigation Resolved' : 'Assign Block Education Officer (BEO)'}
+                                        </h3>
+                                    </div>
+                                    <button 
+                                        onClick={() => setBeoModal({ open: false, alarm: null, assignedBEO: '', notes: '', actionType: 'assign' })} 
+                                        className="text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+
+                                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-slate-900">{beoModal.alarm.name}</span>
+                                        <span className="font-mono text-blue-700 font-bold">{beoModal.alarm.studentId}</span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-600">Releasing School: {beoModal.alarm.releasingSchoolName}</p>
+                                    <p className="text-[11px] text-slate-600">Residence: {beoModal.alarm.address || 'Address on record'}</p>
+                                    <p className="text-[10px] text-amber-800 font-mono font-semibold">Floating TC Duration: {beoModal.alarm.daysElapsed} Days</p>
+                                </div>
+
+                                <form onSubmit={handleSaveBeoAction} className="space-y-3 text-xs">
+                                    {/* Action Toggle */}
+                                    <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBeoModal(prev => ({ ...prev, actionType: 'assign' }))}
+                                            className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+                                                beoModal.actionType === 'assign' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            Assign BEO Field Unit
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setBeoModal(prev => ({ ...prev, actionType: 'resolve' }))}
+                                            className={`flex-1 py-1.5 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+                                                beoModal.actionType === 'resolve' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            Mark Done / Resolve Alarm
+                                        </button>
+                                    </div>
+
+                                    {beoModal.actionType === 'assign' ? (
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Assigned BEO Unit / Officer *</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={beoModal.assignedBEO}
+                                                onChange={(e) => setBeoModal(prev => ({ ...prev, assignedBEO: e.target.value }))}
+                                                placeholder="e.g. BEO - Lucknow Central Block"
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:border-amber-600"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
+                                            Marking this case resolved will clear the alert and remove this candidate from the active Dropout Radar.
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className="block font-semibold text-slate-700 mb-1">
+                                            {beoModal.actionType === 'resolve' ? 'Resolution Remarks & Field Findings *' : 'Field Inspection Directive & Instructions *'}
+                                        </label>
+                                        <textarea
+                                            rows={3}
+                                            required
+                                            value={beoModal.notes}
+                                            onChange={(e) => setBeoModal(prev => ({ ...prev, notes: e.target.value }))}
+                                            placeholder={beoModal.actionType === 'resolve' 
+                                                ? 'e.g. Field visit completed. Student verified enrolled in receiving school / verified genuine migration.' 
+                                                : 'e.g. Conduct physical visit to residence, verify enrollment in local institutions.'}
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:border-amber-600"
+                                        />
+                                    </div>
+
+                                    <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBeoModal({ open: false, alarm: null, assignedBEO: '', notes: '', actionType: 'assign' })}
+                                            className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={actionLoading}
+                                            className={`px-4 py-2 rounded-lg text-white font-bold transition-all shadow-xs cursor-pointer ${
+                                                beoModal.actionType === 'resolve'
+                                                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                                                    : 'bg-amber-600 hover:bg-amber-700'
+                                            }`}
+                                        >
+                                            {actionLoading ? 'Processing...' : (beoModal.actionType === 'resolve' ? 'Confirm & Remove from Radar' : 'Dispatch BEO Task Directive')}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     )}
                 </div>

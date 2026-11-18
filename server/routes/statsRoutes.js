@@ -6,5 +6,6 @@ const statsController = require('../controllers/statsController');
 router.get('/overview', statsController.getOverviewStats);
 router.get('/board-dropout-alarms', statsController.getBoardDropoutAlarms);
 router.get('/dropout-alarms', statsController.getBoardDropoutAlarms);
+router.get('/interstate-migrations', statsController.getInterstateMigrations);
 
 module.exports = router;

@@ -1,5 +1,7 @@
 const Student = require('../models/Student');
 const School = require('../models/School');
+const Task = require('../models/Task');
+const academicProgressionService = require('./academicProgressionService');
 
 /**
  * Retrieve students with dynamic filters: schoolId, state, board, status, level, search, limit
@@ -463,11 +465,69 @@ const addStudentMark = async (id, markData) => {
         credits: credits ? parseFloat(credits) : 4,
         gradePoint: gradePoint ? parseFloat(gradePoint) : (grade === 'A+' ? 10 : (grade === 'A' ? 9 : 8)),
         letterGrade: letterGrade || grade || null,
-        semester: semester || null
+        semester: semester || null,
+        classLevel: markData.classLevel || student.currentClass || null,
+        isPreviousClass: markData.isPreviousClass || false
     });
 
     await student.save();
     return student;
+};
+
+/**
+ * Rectify / Update an existing academic mark record for a student
+ * @param {string} id - Student Unique ID
+ * @param {string} markId - Mark document ID
+ * @param {Object} markData - Updated grade/mark fields
+ */
+const updateStudentMark = async (id, markId, markData) => {
+    const student = await Student.findById(id.toUpperCase());
+    if (!student) {
+        const error = new Error('Student not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const mark = student.marks.id(markId) || student.marks.find(m => m._id.toString() === markId.toString());
+    if (!mark) {
+        const error = new Error('Mark record not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const {
+        subjectName, marksObtained, maxMarks, grade,
+        theoryMarks, practicalMarks, term, academicYear,
+        courseCode, courseTitle, credits, gradePoint, letterGrade, semester,
+        classLevel, isPreviousClass
+    } = markData;
+
+    if (subjectName !== undefined) mark.subjectName = subjectName;
+    if (academicYear !== undefined) mark.academicYear = academicYear;
+    if (term !== undefined) mark.term = term;
+    if (semester !== undefined) mark.semester = semester;
+    if (classLevel !== undefined) mark.classLevel = classLevel;
+    if (isPreviousClass !== undefined) mark.isPreviousClass = isPreviousClass;
+
+    // School marks
+    if (theoryMarks !== undefined) mark.theoryMarks = (theoryMarks !== '' && theoryMarks !== null) ? parseFloat(theoryMarks) : null;
+    if (practicalMarks !== undefined) mark.practicalMarks = (practicalMarks !== '' && practicalMarks !== null) ? parseFloat(practicalMarks) : null;
+    if (marksObtained !== undefined) mark.marksObtained = parseFloat(marksObtained) || 0;
+    if (maxMarks !== undefined) mark.maxMarks = parseFloat(maxMarks) || 100;
+    if (grade !== undefined) mark.grade = grade;
+
+    // Higher Ed marks
+    if (courseCode !== undefined) mark.courseCode = courseCode;
+    if (courseTitle !== undefined) mark.courseTitle = courseTitle;
+    if (credits !== undefined) mark.credits = parseFloat(credits) || 4;
+    if (gradePoint !== undefined) mark.gradePoint = parseFloat(gradePoint) || 0;
+    if (letterGrade !== undefined) {
+        mark.letterGrade = letterGrade;
+        if (!grade) mark.grade = letterGrade;
+    }
+
+    await student.save();
+    return { student, mark };
 };
 
 /**
@@ -484,6 +544,134 @@ const deleteStudentMark = async (id, markId) => {
     }
 
     student.marks = student.marks.filter(m => m._id.toString() !== markId);
+    await student.save();
+    return student;
+};
+
+/**
+ * Promote a student to the next academic standard or graduate Class 12 with official Transfer Certificate (TC)
+ * @param {string} id - Student Unique ID
+ * @param {Object} promotionData - { nextClass, academicSession, section, stream, conduct, reasonForLeaving, tcRemarks, isGraduation }
+ */
+const promoteStudent = async (id, promotionData = {}) => {
+    const student = await Student.findById(id.toUpperCase());
+    if (!student) {
+        const error = new Error('Student not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const { 
+        nextClass, 
+        academicSession, 
+        section, 
+        stream, 
+        conduct, 
+        reasonForLeaving, 
+        tcRemarks, 
+        isGraduation,
+        note
+    } = promotionData;
+
+    const currentClass = student.currentClass || student.qualification || 'Class 10';
+    const isClass12 = currentClass.includes('12') || isGraduation || nextClass === 'Class 12 Passed' || nextClass === 'Passed';
+
+    const currentYear = String(new Date().getFullYear());
+    const session = academicSession || student.currentAcademicSession || `${currentYear}-${parseInt(currentYear, 10) + 1}`;
+
+    if (isClass12) {
+        // Senior Secondary (Class 12) Graduation & Statutory Transfer Certificate Generation for College/University Admission
+        const generatedTcNumber = promotionData.tcNumber || `TC-${student.currentSchoolId || 'CBSE'}-${currentYear}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        student.previousClass = 'Class 12';
+        student.currentClass = 'Class 12 Passed (Alumni)';
+        student.qualification = 'Class 12 Passed';
+        student.course = 'Higher Secondary Examination (Class 12 Passed)';
+        student.courseType = 'Senior Secondary';
+        student.status = 'Transferred'; // Discharged with TC clearance for College / University Degree Admission
+        student.conduct = conduct || 'Excellent';
+        student.reasonForLeaving = reasonForLeaving || 'Higher Secondary Concluded / Eligible for College & University Degree Admission';
+        student.tcNumber = generatedTcNumber;
+        student.tcIssueDate = new Date();
+        student.dateOfLeaving = new Date();
+        student.tcRemarks = tcRemarks || 'Senior Secondary (Class 12) Examination certified passed. Statutory Transfer Certificate (TC) clearance issued for College & University Degree Admission.';
+
+        // Tag all marks of Class 12 as concluded
+        if (student.marks && student.marks.length > 0) {
+            student.marks.forEach(m => {
+                m.isPreviousClass = true;
+                if (!m.classLevel) m.classLevel = 'Class 12';
+            });
+        }
+
+        // Close active history timeline entry
+        const activeHistory = student.history.find(h => h.leftYear === 'Present');
+        if (activeHistory) {
+            activeHistory.leftYear = currentYear;
+            activeHistory.lastClass = 'Class 12';
+            activeHistory.lastCourse = 'Higher Secondary Examination (Class 12 Passed)';
+        }
+
+        if (!student.promotionHistory) student.promotionHistory = [];
+        student.promotionHistory.push({
+            fromClass: 'Class 12',
+            toClass: 'Class 12 Passed (Alumni)',
+            academicSession: session,
+            promotedAt: new Date(),
+            note: note || tcRemarks || 'Graduated Class 12 Senior Secondary. Discharge Transfer Certificate (TC) generated for College/University admission.'
+        });
+    } else {
+        // Standard K-12 Promotion (Class 1 to 11)
+        const targetClass = nextClass || 'Class 11';
+
+        student.previousClass = currentClass;
+        student.currentClass = targetClass;
+        student.qualification = targetClass;
+        student.course = `Standard Schooling (${targetClass})`;
+        if (['Class 11', 'Class 12'].includes(targetClass)) {
+            student.courseType = 'Senior Secondary';
+        }
+        if (session) {
+            student.currentAcademicSession = session;
+        }
+        if (section) {
+            student.section = section;
+        }
+        if (stream) {
+            student.stream = stream;
+            student.branch = stream;
+        }
+
+        student.lastPromotionDate = new Date();
+
+        // Mark previous marks as concluded previous class
+        if (student.marks && student.marks.length > 0) {
+            student.marks.forEach(m => {
+                m.isPreviousClass = true;
+                if (!m.classLevel) {
+                    m.classLevel = currentClass;
+                }
+            });
+        }
+
+        // Update active history entry
+        const activeHistory = student.history.find(h => h.leftYear === 'Present');
+        if (activeHistory) {
+            activeHistory.lastClass = targetClass;
+            activeHistory.lastCourse = student.course;
+            if (student.branch) activeHistory.lastBranch = student.branch;
+        }
+
+        if (!student.promotionHistory) student.promotionHistory = [];
+        student.promotionHistory.push({
+            fromClass: currentClass,
+            toClass: targetClass,
+            academicSession: session,
+            promotedAt: new Date(),
+            note: note || `Operator certified annual academic promotion from ${currentClass} to ${targetClass}.`
+        });
+    }
+
     await student.save();
     return student;
 };
@@ -519,14 +707,15 @@ const checkEnrollmentEligibility = async (query) => {
         };
     }
 
-    if (student.status === 'Transferred') {
+    if (student.status === 'Transferred' || (student.status === 'Passed' && !!student.tcNumber)) {
         const lastHist = student.history && student.history.length > 0 ? student.history[student.history.length - 1] : null;
         return {
             eligible: true,
-            status: 'Transferred',
+            status: student.status,
             message: 'CLEARANCE VERIFIED: Student has an official Transfer Certificate (TC) clearance and is eligible for admission.',
             student: {
                 uniqueId: student.uniqueId,
+                status: student.status,
                 name: student.name,
                 fatherName: student.fatherName,
                 motherName: student.motherName,
@@ -653,6 +842,76 @@ const reviewAgencyRequest = async (requestId, reviewData) => {
     return request;
 };
 
+/**
+ * Update BEO Dropout Investigation status or mark case resolved
+ * @param {string} studentId
+ * @param {Object} investigationData
+ */
+const updateDropoutInvestigation = async (studentId, investigationData) => {
+    const { status, assignedBEO, notes, resolvedBy } = investigationData;
+    const student = await Student.findById(studentId.toUpperCase());
+    if (!student) {
+        const error = new Error('Student record not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    student.dropoutInvestigationStatus = status || 'Assigned_BEO';
+    student.dropoutInvestigationNotes = notes || student.dropoutInvestigationNotes;
+
+    if (status === 'Assigned_BEO') {
+        student.assignedBEO = assignedBEO || 'BEO Field Unit';
+        
+        // Dispatch official state Task for District & Block Education Office
+        const year = new Date().getFullYear();
+        const count = await Task.countDocuments();
+        const taskId = `TSK-${year}-${String(count + 1).padStart(4, '0')}`;
+        
+        const newTask = new Task({
+            taskId,
+            title: `BEO Field Visit: Investigate Floating TC for ${student.name} (${student.uniqueId})`,
+            description: `State Retention Directive: Conduct field inspection for candidate ${student.name} (S/O ${student.fatherName || 'Guardian'}), residing at ${student.address || 'recorded residence'}. Student has been floating on TC #${student.tcNumber} from ${student.currentSchoolName || 'releasing school'} without verified enrollment. Directive notes: ${notes || 'Verify local school admission or family migration.'}`,
+            category: 'DROPOUT_INVESTIGATION',
+            tier: 'state',
+            assignedTo: assignedBEO || 'BEO-FIELD-SQUAD',
+            assignedBy: resolvedBy || 'State Education Directorate',
+            priority: 'High',
+            status: 'Pending',
+            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+            relatedEntityId: student.uniqueId,
+            relatedEntityType: 'Student',
+            activityLog: [{
+                action: 'BEO Directive Dispatched',
+                performedBy: resolvedBy || 'State Education Directorate',
+                note: `Field assignment allocated to ${assignedBEO || 'BEO Field Squad'}`
+            }]
+        });
+        await newTask.save().catch(err => console.warn('Could not persist task:', err.message));
+    } else if (status === 'Resolved') {
+        student.dropoutInvestigationStatus = 'Resolved';
+        student.dropoutResolvedAt = new Date();
+        student.dropoutResolvedBy = resolvedBy || 'State Directorate Officer';
+        
+        // Mark associated task as completed if any exists
+        await Task.updateMany(
+            { relatedEntityId: student.uniqueId, category: 'DROPOUT_INVESTIGATION' },
+            { 
+                status: 'Completed',
+                $push: {
+                    activityLog: {
+                        action: 'Investigation Concluded',
+                        performedBy: resolvedBy || 'State Directorate Officer',
+                        note: notes || 'Case marked resolved. Candidate verified/cleared from dropout radar.'
+                    }
+                }
+            }
+        ).catch(() => {});
+    }
+
+    await student.save();
+    return student;
+};
+
 module.exports = {
     getAllStudents,
     searchStudents,
@@ -663,10 +922,13 @@ module.exports = {
     enrollStudent,
     getStudentMarks,
     addStudentMark,
+    updateStudentMark,
     deleteStudentMark,
+    promoteStudent,
     checkEnrollmentEligibility,
     createAgencyRequest,
     getAgencyRequests,
-    reviewAgencyRequest
+    reviewAgencyRequest,
+    updateDropoutInvestigation
 };
 

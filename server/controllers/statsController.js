@@ -24,7 +24,21 @@ const getBoardDropoutAlarms = async (req, res) => {
     }
 };
 
+/**
+ * Get Interstate Migrated Students
+ */
+const getInterstateMigrations = async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit, 10) || 10;
+        const migrations = await statsService.getInterstateMigrations(limit);
+        res.json(migrations);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     getOverviewStats,
-    getBoardDropoutAlarms
+    getBoardDropoutAlarms,
+    getInterstateMigrations
 };

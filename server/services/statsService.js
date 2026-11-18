@@ -108,6 +108,8 @@ const getPlatformStats = async (query = {}) => {
     .sort({ updatedAt: -1 })
     .limit(6);
 
+    const interstateMigrations = await getInterstateMigrations(10);
+
     return {
         totalStudents,
         activeStudents,
@@ -121,6 +123,7 @@ const getPlatformStats = async (query = {}) => {
         genderStats,
         levelDistribution,
         recentTransfers,
+        interstateMigrations,
         scope: query.state || query.board || 'National'
     };
 };
@@ -131,7 +134,10 @@ const getPlatformStats = async (query = {}) => {
  * @param {string} stateQuery - Optional filter e.g. 'Uttar Pradesh', 'Delhi', 'All'
  */
 const getBoardDropoutAlarms = async (boardQuery, stateQuery) => {
-    const transferredStudents = await Student.find({ status: 'Transferred' });
+    const transferredStudents = await Student.find({ 
+        status: 'Transferred',
+        dropoutInvestigationStatus: { $ne: 'Resolved' }
+    });
     const schools = await School.find();
     const schoolMap = new Map();
     schools.forEach(s => schoolMap.set(s._id, s));
@@ -205,7 +211,10 @@ const getBoardDropoutAlarms = async (boardQuery, stateQuery) => {
             tcIssueDate: issueDate,
             daysElapsed,
             riskLevel,
-            alertBadge
+            alertBadge,
+            dropoutInvestigationStatus: student.dropoutInvestigationStatus || 'Pending',
+            assignedBEO: student.assignedBEO || null,
+            dropoutInvestigationNotes: student.dropoutInvestigationNotes || null
         });
     }
 
@@ -220,7 +229,125 @@ const getBoardDropoutAlarms = async (boardQuery, stateQuery) => {
     };
 };
 
+/**
+ * Retrieve recently migrated students across state boundaries
+ * @param {number} [limit=10]
+ */
+const getInterstateMigrations = async (limit = 10) => {
+    const schools = await School.find().lean();
+    const schoolMap = new Map();
+    schools.forEach(s => schoolMap.set(s._id, s));
+
+    const getStateForSchool = (schoolId) => {
+        if (!schoolId) return null;
+        const s = schoolMap.get(schoolId);
+        if (s && s.state) return s.state;
+        const reg = (s?.region || '').toLowerCase();
+        const addr = (s?.address || '').toLowerCase();
+        const id = String(schoolId).toUpperCase();
+        if (id.includes('DU') || id.includes('DELHI') || reg.includes('delhi') || addr.includes('delhi')) return 'Delhi (NCT)';
+        if (id.includes('UP') || reg.includes('uttar pradesh') || reg.includes('lucknow') || reg.includes('noida') || reg.includes('varanasi') || addr.includes('uttar pradesh') || addr.includes('noida')) return 'Uttar Pradesh';
+        if (id.includes('WB') || reg.includes('west bengal') || reg.includes('kolkata')) return 'West Bengal';
+        if (id.includes('MH') || reg.includes('maharashtra') || reg.includes('mumbai')) return 'Maharashtra';
+        if (id.includes('KA') || reg.includes('karnataka') || reg.includes('bangalore')) return 'Karnataka';
+        return s?.state || 'Delhi (NCT)';
+    };
+
+    // Find candidate students with history or transfers
+    const students = await Student.find({
+        $or: [
+            { 'history.1': { $exists: true } },
+            { status: 'Transferred' },
+            { tcNumber: { $ne: null } }
+        ]
+    }).sort({ updatedAt: -1 }).lean();
+
+    const migrations = [];
+
+    for (const student of students) {
+        let fromSchool = null;
+        let fromSchoolId = null;
+        let fromState = null;
+        let toSchool = null;
+        let toSchoolId = null;
+        let toState = null;
+        let statusBadge = student.status === 'Transferred' ? 'TC Clearance Active' : 'Admitted / Enrolled';
+        const tcRef = student.tcNumber || (student.history && student.history.length > 0 ? `TC-MIG-${student.uniqueId}` : 'TC-SOVEREIGN-VERIFIED');
+        const migrationDate = student.tcIssueDate || student.updatedAt || student.createdAt || new Date();
+
+        if (student.history && student.history.length >= 2) {
+            const firstHist = student.history[0];
+            const lastHist = student.history[student.history.length - 1];
+            fromSchoolId = firstHist.schoolId;
+            fromSchool = firstHist.schoolName;
+            fromState = getStateForSchool(fromSchoolId) || (fromSchool.includes('Noida') || fromSchool.includes('Lucknow') ? 'Uttar Pradesh' : 'Delhi (NCT)');
+
+            toSchoolId = lastHist.schoolId || student.currentSchoolId;
+            toSchool = lastHist.schoolName || student.currentSchoolName;
+            toState = getStateForSchool(toSchoolId) || (toSchool.includes('Delhi') ? 'Delhi (NCT)' : 'Uttar Pradesh');
+
+            if (fromState !== toState) {
+                migrations.push({
+                    uniqueId: student.uniqueId,
+                    name: student.name,
+                    gender: student.gender,
+                    currentClass: student.currentClass || student.course || student.qualification,
+                    academicLevel: student.academicLevel || 'school',
+                    stream: student.stream || student.branch || student.department || 'General',
+                    fromSchool,
+                    fromSchoolId,
+                    fromState,
+                    toSchool,
+                    toSchoolId,
+                    toState,
+                    corridor: `${fromState} ➔ ${toState}`,
+                    tcNumber: tcRef,
+                    date: migrationDate,
+                    reason: student.reasonForLeaving || 'Interstate Transition & Academic Advancement',
+                    status: student.status,
+                    statusBadge,
+                    conduct: student.conduct || 'Good'
+                });
+            }
+        } else if (student.status === 'Transferred' || student.tcNumber) {
+            const lastHist = student.history && student.history.length > 0 ? student.history[student.history.length - 1] : null;
+            fromSchoolId = student.currentSchoolId || lastHist?.schoolId || 'SCH-CBSE-01';
+            fromSchool = student.currentSchoolName || lastHist?.schoolName || 'Delhi Public School (DPS Noida)';
+            fromState = getStateForSchool(fromSchoolId) || (fromSchool.includes('Noida') || fromSchool.includes('Lucknow') ? 'Uttar Pradesh' : 'Delhi (NCT)');
+
+            toState = fromState === 'Uttar Pradesh' ? 'Delhi (NCT)' : 'Uttar Pradesh';
+            toSchool = student.reasonForLeaving?.includes('Varanasi') ? 'Target Institution (Varanasi/East UP)' : 'Target Institution (Interstate Transfer Clearance)';
+            statusBadge = 'TC Clearance (Floating)';
+
+            migrations.push({
+                uniqueId: student.uniqueId,
+                name: student.name,
+                gender: student.gender,
+                currentClass: student.currentClass || student.course || student.qualification,
+                academicLevel: student.academicLevel || 'school',
+                stream: student.stream || student.branch || student.department || 'General',
+                fromSchool,
+                fromSchoolId,
+                fromState,
+                toSchool,
+                toSchoolId,
+                toState,
+                corridor: `${fromState} ➔ ${toState}`,
+                tcNumber: tcRef,
+                date: migrationDate,
+                reason: student.reasonForLeaving || 'Parental Relocation / Inter-State School Transfer',
+                status: student.status,
+                statusBadge,
+                conduct: student.conduct || 'Good'
+            });
+        }
+    }
+
+    return migrations.slice(0, limit);
+};
+
 module.exports = {
     getPlatformStats,
-    getBoardDropoutAlarms
+    getBoardDropoutAlarms,
+    getInterstateMigrations
 };

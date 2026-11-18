@@ -3,9 +3,9 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { 
     User, MapPin, Calendar, BookOpen, GraduationCap, ArrowLeft, Building, FileCheck, 
-    Edit, Save, X, Phone, Mail, Award, CheckCircle2, Plus, Trash2, Printer, ShieldAlert, 
+    Edit, Edit2, Save, X, Phone, Mail, Award, CheckCircle2, Plus, Trash2, Printer, ShieldAlert, 
     Upload, Copy, Check, FileText, ArrowRightLeft, ShieldCheck, History, AlertCircle, 
-    QrCode, ExternalLink, Lock, CheckCheck, Landmark, School, BadgePercent
+    QrCode, ExternalLink, Lock, CheckCheck, Landmark, School, BadgePercent, ArrowUpRight
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 
@@ -64,6 +64,39 @@ const StudentDetails = () => {
         conduct: 'Excellent',
         reasonForLeaving: 'Completed Standard / Migrating for Higher Studies',
         tcRemarks: 'Exemplary conduct and active participant in co-curricular activities. Cleared all institutional dues.'
+    });
+
+    // Rectify / Edit mark modal state
+    const [showEditMarkModal, setShowEditMarkModal] = useState(false);
+    const [editMarkForm, setEditMarkForm] = useState({
+        _id: '',
+        academicYear: '2024-2025',
+        classLevel: '',
+        subjectName: '',
+        theoryMarks: '',
+        practicalMarks: '',
+        marksObtained: '',
+        maxMarks: '100',
+        grade: 'A1',
+        term: 'Annual',
+        courseCode: '',
+        courseTitle: '',
+        credits: '4',
+        gradePoint: '10',
+        letterGrade: 'O',
+        semester: 'Semester 1'
+    });
+
+    // Promotion / Class 12 Graduation modal state
+    const [showPromoteModal, setShowPromoteModal] = useState(false);
+    const [promoteForm, setPromoteForm] = useState({
+        nextClass: '',
+        academicSession: '2025-2026',
+        section: 'A',
+        stream: 'General',
+        conduct: 'Excellent',
+        reasonForLeaving: 'Higher Secondary Concluded / Eligible for College & University Degree Admission',
+        remarks: ''
     });
 
     // Marksheet session filter state
@@ -260,6 +293,110 @@ const StudentDetails = () => {
             setMarks(marksRes.data);
         } catch (err) {
             alert(err.response?.data?.error || "Failed to remove mark entry");
+        }
+    };
+
+    const handleOpenEditMark = (m) => {
+        setEditMarkForm({
+            _id: m._id || m.id,
+            academicYear: m.academicYear || '2024-2025',
+            classLevel: m.classLevel || student?.previousClass || student?.currentClass || 'Class 10',
+            subjectName: m.subjectName || m.courseTitle || '',
+            theoryMarks: m.theoryMarks !== null && m.theoryMarks !== undefined ? m.theoryMarks : '',
+            practicalMarks: m.practicalMarks !== null && m.practicalMarks !== undefined ? m.practicalMarks : '',
+            marksObtained: m.marksObtained !== null && m.marksObtained !== undefined ? m.marksObtained : '',
+            maxMarks: m.maxMarks || 100,
+            grade: m.grade || m.letterGrade || 'A1',
+            term: m.term || 'Annual',
+            courseCode: m.courseCode || '',
+            courseTitle: m.courseTitle || m.subjectName || '',
+            credits: m.credits || 4,
+            gradePoint: m.gradePoint || 10,
+            letterGrade: m.letterGrade || m.grade || 'O',
+            semester: m.semester || 'Semester 1'
+        });
+        setShowEditMarkModal(true);
+    };
+
+    const handleUpdateMark = async (e) => {
+        e.preventDefault();
+        try {
+            const payload = {
+                academicYear: editMarkForm.academicYear,
+                classLevel: editMarkForm.classLevel
+            };
+            if (isHigherEd) {
+                payload.courseCode = editMarkForm.courseCode;
+                payload.courseTitle = editMarkForm.courseTitle || editMarkForm.subjectName;
+                payload.subjectName = payload.courseTitle;
+                payload.credits = parseFloat(editMarkForm.credits) || 4;
+                payload.gradePoint = parseFloat(editMarkForm.gradePoint) || 10;
+                payload.letterGrade = editMarkForm.letterGrade || 'O';
+                payload.marksObtained = payload.gradePoint;
+                payload.maxMarks = 10;
+                payload.grade = payload.letterGrade;
+                payload.semester = editMarkForm.semester || 'Semester 1';
+            } else {
+                payload.subjectName = editMarkForm.subjectName;
+                payload.theoryMarks = editMarkForm.theoryMarks !== '' ? parseFloat(editMarkForm.theoryMarks) : null;
+                payload.practicalMarks = editMarkForm.practicalMarks !== '' ? parseFloat(editMarkForm.practicalMarks) : null;
+                payload.marksObtained = parseFloat(editMarkForm.marksObtained);
+                payload.maxMarks = parseFloat(editMarkForm.maxMarks) || 100;
+                payload.grade = editMarkForm.grade;
+                payload.term = editMarkForm.term || 'Annual';
+            }
+
+            await axios.put(`/api/student/${student.uniqueId}/marks/${editMarkForm._id}`, payload);
+            setShowEditMarkModal(false);
+            fetchStudentData();
+        } catch (err) {
+            alert(err.response?.data?.error || "Failed to rectify academic mark");
+        }
+    };
+
+    const handleOpenPromote = () => {
+        const curr = student?.currentClass || 'Class 10';
+        let next = 'Class 11';
+        const numMatch = curr.match(/\d+/);
+        if (numMatch) {
+            const num = parseInt(numMatch[0], 10);
+            if (num >= 1 && num < 12) {
+                next = `Class ${num + 1}`;
+            } else if (num === 12) {
+                next = 'Class 12 Passed';
+            }
+        }
+        setPromoteForm({
+            nextClass: next,
+            academicSession: '2025-2026',
+            section: student?.section || 'A',
+            stream: student?.stream || 'Science (PCM)',
+            conduct: student?.conduct || 'Excellent',
+            reasonForLeaving: 'Higher Secondary Concluded / Eligible for College & University Degree Admission',
+            remarks: curr.includes('12') 
+                ? 'Senior Secondary (Class 12) Examination certified passed. Discharged with statutory Transfer Certificate (TC) clearance for College/University Degree Admission.'
+                : `Annual academic examination verified and passed. Promoted to ${next}.`
+        });
+        setShowPromoteModal(true);
+    };
+
+    const handlePromoteStudent = async (e) => {
+        e.preventDefault();
+        try {
+            const is12 = student?.currentClass?.includes('12') || promoteForm.nextClass.includes('Passed');
+            const res = await axios.post(`/api/student/${student.uniqueId}/promote`, {
+                ...promoteForm,
+                isGraduation: is12
+            });
+            setShowPromoteModal(false);
+            fetchStudentData();
+            if (is12) {
+                alert(`Class 12 Graduation certified! Official Transfer Certificate (${res.data.student.tcNumber}) generated. Candidate is now unlocked for College/University degree admission.`);
+            } else {
+                alert(`Student successfully promoted to ${res.data.student.currentClass}!`);
+            }
+        } catch (err) {
+            alert(err.response?.data?.error || "Failed to certify promotion");
         }
     };
 
@@ -487,8 +624,16 @@ const StudentDetails = () => {
                                     <GraduationCap size={14} className="text-blue-400" />
                                     {isHigherEd 
                                         ? `${student.degree || student.course || 'Degree Program'} (${student.department || student.branch || 'General'})`
-                                        : `${student.qualification || student.currentClass || 'Standard Level'} (${student.section ? `Sec ${student.section}` : student.stream || 'General'})`}
+                                        : `${student.currentClass || student.qualification || 'Standard Level'} (${student.section ? `Sec ${student.section}` : student.stream || 'General'})`}
                                 </span>
+                                {student.previousClass && (
+                                    <>
+                                        <span>&bull;</span>
+                                        <span className="text-amber-300 font-medium">
+                                            Prev: {student.previousClass}
+                                        </span>
+                                    </>
+                                )}
                                 {(student.rollNumber || student.prnNumber) && (
                                     <>
                                         <span>&bull;</span>
@@ -773,7 +918,24 @@ const StudentDetails = () => {
                         </div>
                         
                         {canManageMarks && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {!isHigherEd && student?.status === 'Active' && (
+                                    student?.currentClass?.includes('12') ? (
+                                        <button
+                                            onClick={handleOpenPromote}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
+                                        >
+                                            <GraduationCap size={15} /> Graduate Class 12 & Issue TC
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={handleOpenPromote}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
+                                        >
+                                            <ArrowUpRight size={15} /> Promote to Next Standard
+                                        </button>
+                                    )
+                                )}
                                 <button
                                     onClick={() => setShowAddMarkModal(true)}
                                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold shadow-xs cursor-pointer"
@@ -792,42 +954,81 @@ const StudentDetails = () => {
 
                     {/* Summary Metrics Bar */}
                     {marks.length > 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            {isHigherEd ? (
-                                <>
-                                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Accumulated Credits</p>
-                                        <p className="text-xl font-black text-slate-900 mt-0.5">{summaryMetrics.totalCredits} / {student.totalCreditsRequired || 160}</p>
+                        <div className="space-y-3">
+                            {!isHigherEd && (
+                                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 text-amber-900 space-y-2">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-200/80 text-amber-900 border border-amber-300">
+                                                Academic Evaluation Desk
+                                            </span>
+                                            <span className="text-xs font-bold text-amber-950">
+                                                {student.previousClass ? `Previous Standard: ${student.previousClass}` : `Standard: ${student.currentClass || 'Class 10'}`}
+                                            </span>
+                                        </div>
+                                        <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded self-start sm:self-auto">
+                                            Current Status: {student.status === 'Transferred' ? 'Graduated / Discharged (TC Active)' : (student.currentClass || 'Class 10')}
+                                        </span>
                                     </div>
-                                    <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
-                                        <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider font-mono">Cumulative CGPA</p>
-                                        <p className="text-xl font-black text-blue-900 mt-0.5">{student.cgpa || summaryMetrics.cgpa} / 10.0</p>
-                                    </div>
-                                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                                        <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider font-mono">Degree Standing</p>
-                                        <p className="text-xs font-bold text-emerald-900 mt-1">
-                                            {summaryMetrics.totalCredits >= 160 ? 'Degree Completed (Distinction)' : 'Active Good Standing'}
-                                        </p>
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Aggregate Marks</p>
-                                        <p className="text-xl font-black text-slate-900 mt-0.5">{summaryMetrics.totalMarks} / {summaryMetrics.maxMarks}</p>
-                                    </div>
-                                    <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
-                                        <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider font-mono">Cumulative Percentage</p>
-                                        <p className="text-xl font-black text-blue-900 mt-0.5">{summaryMetrics.percentage}%</p>
-                                    </div>
-                                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                                        <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider font-mono">Board Division</p>
-                                        <p className="text-xs font-bold text-emerald-900 mt-1">
-                                            {parseFloat(summaryMetrics.percentage) >= 75 ? 'First Division with Distinction' : 'First Division'}
-                                        </p>
-                                    </div>
-                                </>
+                                    <p className="text-xs text-amber-800/90 leading-relaxed font-medium">
+                                        <strong>Operator Promotion & Rectification Governance:</strong> Students do not advance automatically. The authorized examination operator evaluates academic performance, rectifies previous records if necessary, and explicitly certifies promotion to the next standard or issues a Transfer Certificate (TC) upon completion of Class 12 for university admission.
+                                    </p>
+                                </div>
                             )}
+
+                            {student?.tcNumber && (
+                                <div className="p-3.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <ShieldCheck className="text-emerald-600 shrink-0" size={18} />
+                                        <span className="text-xs font-bold">
+                                            Statutory Transfer Certificate Clearance: <span className="font-mono text-emerald-800">{student.tcNumber}</span>
+                                        </span>
+                                    </div>
+                                    <span className="text-[11px] font-mono font-bold bg-emerald-200/80 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded self-start sm:self-auto">
+                                        Cleared for Higher Education Admission
+                                    </span>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                {isHigherEd ? (
+                                    <>
+                                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Accumulated Credits</p>
+                                            <p className="text-xl font-black text-slate-900 mt-0.5">{summaryMetrics.totalCredits} / {student.totalCreditsRequired || 160}</p>
+                                        </div>
+                                        <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
+                                            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider font-mono">Cumulative CGPA</p>
+                                            <p className="text-xl font-black text-blue-900 mt-0.5">{student.cgpa || summaryMetrics.cgpa} / 10.0</p>
+                                        </div>
+                                        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                                            <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider font-mono">Degree Standing</p>
+                                            <p className="text-xs font-bold text-emerald-900 mt-1">
+                                                {summaryMetrics.totalCredits >= 160 ? 'Degree Completed (Distinction)' : 'Active Good Standing'}
+                                            </p>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                                                Previous Class ({student.previousClass || (student.currentClass?.includes('11') ? 'Class 10' : student.currentClass?.includes('12') ? 'Class 11' : 'Class 10')}) Aggregate
+                                            </p>
+                                            <p className="text-xl font-black text-slate-900 mt-0.5">{summaryMetrics.totalMarks} / {summaryMetrics.maxMarks}</p>
+                                        </div>
+                                        <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
+                                            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider font-mono">Cumulative Percentage</p>
+                                            <p className="text-xl font-black text-blue-900 mt-0.5">{summaryMetrics.percentage}%</p>
+                                        </div>
+                                        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                                            <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider font-mono">Board Division</p>
+                                            <p className="text-xs font-bold text-emerald-900 mt-1">
+                                                {parseFloat(summaryMetrics.percentage) >= 75 ? 'First Division with Distinction' : 'First Division'}
+                                            </p>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -836,7 +1037,8 @@ const StudentDetails = () => {
                         <table className="w-full text-xs text-left">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
-                                    <th className="py-2.5 px-4">{isHigherEd ? 'Semester / Session' : 'Academic Term'}</th>
+                                    <th className="py-2.5 px-4">{isHigherEd ? 'Semester / Session' : 'Academic Term & Session'}</th>
+                                    {!isHigherEd && <th className="py-2.5 px-4">Standard / Class</th>}
                                     <th className="py-2.5 px-4">{isHigherEd ? 'Course Code & Subject Title' : 'Subject Name'}</th>
                                     {!isHigherEd && <th className="py-2.5 px-4 text-center">Theory</th>}
                                     {!isHigherEd && <th className="py-2.5 px-4 text-center">Practical</th>}
@@ -849,7 +1051,22 @@ const StudentDetails = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {marks.map((m, idx) => (
                                     <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
-                                        <td className="py-2.5 px-4 font-bold text-slate-900">{m.semester || m.academicYear}</td>
+                                        <td className="py-2.5 px-4 font-bold text-slate-900">
+                                            {m.semester || m.academicYear}
+                                            {(!isHigherEd && (m.academicYear === '2024-2025' || m.isPreviousClass)) && (
+                                                <span className="block text-[9px] font-mono text-amber-700 font-normal">
+                                                    Concluded Session
+                                                </span>
+                                            )}
+                                        </td>
+                                        {!isHigherEd && (
+                                            <td className="py-2.5 px-4 font-semibold text-slate-800">
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                                    {m.classLevel || student.previousClass || (m.academicYear === '2024-2025' ? 'Class 10' : student.currentClass)}
+                                                </span>
+                                                <span className="block text-[9px] text-slate-500 mt-0.5 font-medium">Previous Class</span>
+                                            </td>
+                                        )}
                                         <td className="py-2.5 px-4 font-medium text-slate-800">
                                             {m.courseCode ? <span className="font-mono font-bold text-blue-700 mr-1.5">{m.courseCode}</span> : null}
                                             {m.subjectName || m.courseTitle}
@@ -865,13 +1082,22 @@ const StudentDetails = () => {
                                         </td>
                                         {canManageMarks && (
                                             <td className="py-2.5 px-4 text-right">
-                                                <button
-                                                    onClick={() => handleDeleteMark(m._id || m.id)}
-                                                    className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                                                    title="Delete mark entry"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                <div className="inline-flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => handleOpenEditMark(m)}
+                                                        className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                                        title="Rectify grade record"
+                                                    >
+                                                        <Edit2 size={13} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteMark(m._id || m.id)}
+                                                        className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                                        title="Delete mark entry"
+                                                    >
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         )}
                                     </tr>
@@ -1210,6 +1436,412 @@ const StudentDetails = () => {
                                 </button>
                                 <button type="submit" className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl cursor-pointer">
                                     Confirm & Discharge
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================
+                MODAL: RECTIFY / EDIT ACADEMIC MARK
+               ======================================================== */}
+            {showEditMarkModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+                    <div className="bg-white border border-slate-200 w-full max-w-lg rounded-2xl p-6 shadow-2xl text-left relative max-h-[90vh] overflow-y-auto">
+                        <button onClick={() => setShowEditMarkModal(false)} className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-900 cursor-pointer">
+                            <X size={18} />
+                        </button>
+                        
+                        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                            <Edit2 size={24} />
+                        </div>
+
+                        <h3 className="text-base font-bold text-slate-900">Rectify Academic Grade Record</h3>
+                        <p className="text-xs text-slate-500 mt-1 mb-4">
+                            Adjust scores, theory/practical breakdown, session, standard, or letter grade for this academic entry.
+                        </p>
+
+                        <form onSubmit={handleUpdateMark} className="space-y-4 text-xs">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">Academic Session *</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        value={editMarkForm.academicYear} 
+                                        onChange={(e) => setEditMarkForm({...editMarkForm, academicYear: e.target.value})} 
+                                        placeholder="2024-2025" 
+                                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                    />
+                                </div>
+                                {!isHigherEd ? (
+                                    <div>
+                                        <label className="block font-semibold text-slate-700 mb-1">Standard / Class *</label>
+                                        <input 
+                                            type="text" 
+                                            required 
+                                            value={editMarkForm.classLevel} 
+                                            onChange={(e) => setEditMarkForm({...editMarkForm, classLevel: e.target.value})} 
+                                            placeholder="e.g. Class 10" 
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block font-semibold text-slate-700 mb-1">Semester *</label>
+                                        <select 
+                                            value={editMarkForm.semester} 
+                                            onChange={(e) => setEditMarkForm({...editMarkForm, semester: e.target.value})} 
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                                        >
+                                            {['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8'].map(s => (
+                                                <option key={s} value={s}>{s}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            {isHigherEd ? (
+                                <>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Course Code</label>
+                                            <input 
+                                                type="text" 
+                                                value={editMarkForm.courseCode} 
+                                                onChange={(e) => setEditMarkForm({...editMarkForm, courseCode: e.target.value})} 
+                                                placeholder="e.g. CS501" 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono uppercase"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block font-semibold text-slate-700 mb-1">Course Title *</label>
+                                            <input 
+                                                type="text" 
+                                                required 
+                                                value={editMarkForm.courseTitle} 
+                                                onChange={(e) => setEditMarkForm({...editMarkForm, courseTitle: e.target.value, subjectName: e.target.value})} 
+                                                placeholder="Course title" 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Credits *</label>
+                                            <input 
+                                                type="number" 
+                                                required 
+                                                value={editMarkForm.credits} 
+                                                onChange={(e) => setEditMarkForm({...editMarkForm, credits: e.target.value})} 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Grade Point *</label>
+                                            <input 
+                                                type="number" 
+                                                step="0.1" 
+                                                required 
+                                                value={editMarkForm.gradePoint} 
+                                                onChange={(e) => setEditMarkForm({...editMarkForm, gradePoint: e.target.value})} 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Letter Grade</label>
+                                            <select 
+                                                value={editMarkForm.letterGrade} 
+                                                onChange={(e) => setEditMarkForm({...editMarkForm, letterGrade: e.target.value, grade: e.target.value})} 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                            >
+                                                <option value="O">O (10)</option>
+                                                <option value="A+">A+ (9)</option>
+                                                <option value="A">A (8)</option>
+                                                <option value="B+">B+ (7)</option>
+                                                <option value="B">B (6)</option>
+                                                <option value="C">C (5)</option>
+                                                <option value="F">F (0)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="block font-semibold text-slate-700 mb-1">Subject Name *</label>
+                                        <input 
+                                            type="text" 
+                                            required 
+                                            value={editMarkForm.subjectName} 
+                                            onChange={(e) => setEditMarkForm({...editMarkForm, subjectName: e.target.value})} 
+                                            placeholder="e.g. Mathematics Standard" 
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Theory Marks</label>
+                                            <input 
+                                                type="number" 
+                                                value={editMarkForm.theoryMarks} 
+                                                onChange={(e) => {
+                                                    const theory = e.target.value;
+                                                    const prac = editMarkForm.practicalMarks;
+                                                    const tot = (parseFloat(theory) || 0) + (parseFloat(prac) || 0);
+                                                    setEditMarkForm({
+                                                        ...editMarkForm, 
+                                                        theoryMarks: theory,
+                                                        marksObtained: (theory !== '' || prac !== '') ? String(tot) : editMarkForm.marksObtained
+                                                    });
+                                                }} 
+                                                placeholder="e.g. 75" 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Practical Marks</label>
+                                            <input 
+                                                type="number" 
+                                                value={editMarkForm.practicalMarks} 
+                                                onChange={(e) => {
+                                                    const prac = e.target.value;
+                                                    const theory = editMarkForm.theoryMarks;
+                                                    const tot = (parseFloat(theory) || 0) + (parseFloat(prac) || 0);
+                                                    setEditMarkForm({
+                                                        ...editMarkForm, 
+                                                        practicalMarks: prac,
+                                                        marksObtained: (theory !== '' || prac !== '') ? String(tot) : editMarkForm.marksObtained
+                                                    });
+                                                }} 
+                                                placeholder="e.g. 20" 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Total Marks *</label>
+                                            <input 
+                                                type="number" 
+                                                required 
+                                                value={editMarkForm.marksObtained} 
+                                                onChange={(e) => setEditMarkForm({...editMarkForm, marksObtained: e.target.value})} 
+                                                placeholder="95" 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Max Marks *</label>
+                                            <input 
+                                                type="number" 
+                                                required 
+                                                value={editMarkForm.maxMarks} 
+                                                onChange={(e) => setEditMarkForm({...editMarkForm, maxMarks: e.target.value})} 
+                                                placeholder="100" 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Grade</label>
+                                            <select 
+                                                value={editMarkForm.grade} 
+                                                onChange={(e) => setEditMarkForm({...editMarkForm, grade: e.target.value})} 
+                                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                            >
+                                                <option value="A1">A1</option>
+                                                <option value="A2">A2</option>
+                                                <option value="B1">B1</option>
+                                                <option value="B2">B2</option>
+                                                <option value="C1">C1</option>
+                                                <option value="C2">C2</option>
+                                                <option value="D">D</option>
+                                                <option value="E">E</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                                <button type="button" onClick={() => setShowEditMarkModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl cursor-pointer">
+                                    Cancel
+                                </button>
+                                <button type="submit" className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl cursor-pointer">
+                                    Update Grade
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================
+                MODAL: OPERATOR PROMOTION & CLASS 12 GRADUATION
+               ======================================================== */}
+            {showPromoteModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+                    <div className="bg-white border border-slate-200 w-full max-w-lg rounded-2xl p-6 shadow-2xl text-left relative max-h-[90vh] overflow-y-auto">
+                        <button onClick={() => setShowPromoteModal(false)} className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-900 cursor-pointer">
+                            <X size={18} />
+                        </button>
+
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 ${
+                            student?.currentClass?.includes('12') ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'
+                        }`}>
+                            {student?.currentClass?.includes('12') ? <GraduationCap size={24} /> : <ArrowUpRight size={24} />}
+                        </div>
+
+                        <h3 className="text-base font-bold text-slate-900">
+                            {student?.currentClass?.includes('12') 
+                                ? 'Senior Secondary (Class 12) Graduation & Transfer TC Issuance' 
+                                : 'Promote Student to Next Standard'}
+                        </h3>
+                        
+                        {student?.currentClass?.includes('12') ? (
+                            <div className="my-3 p-3.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-950 space-y-1.5 text-xs">
+                                <p className="font-bold flex items-center gap-1.5">
+                                    <CheckCircle2 size={15} className="text-emerald-700" />
+                                    Statutory Higher Education Eligibility Pathway
+                                </p>
+                                <p className="leading-relaxed text-emerald-900/90">
+                                    Certifying completion of Class 12 automatically marks the student as <strong>Passed</strong>, issues an official <strong>Discharge Transfer Certificate (TC)</strong>, and clears their single-institution lock. This allows any College or University to immediately admit them into degree programs (B.Tech, B.Sc, B.Com, BA, etc.) in the Admissions Hub.
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-500 mt-1 mb-4">
+                                Certify the student's progression to the next academic standard upon successful evaluation of annual examination marks.
+                            </p>
+                        )}
+
+                        <form onSubmit={handlePromoteStudent} className="space-y-4 text-xs">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">Current Standard</label>
+                                    <div className="w-full bg-slate-100 border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold text-slate-800">
+                                        {student?.currentClass || 'Class 10'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">
+                                        {student?.currentClass?.includes('12') ? 'Target Outcome' : 'Promoted Standard *'}
+                                    </label>
+                                    {student?.currentClass?.includes('12') ? (
+                                        <div className="w-full bg-emerald-100/70 border border-emerald-300 rounded-xl px-3 py-2 font-mono font-bold text-emerald-900">
+                                            Class 12 Passed (Alumni)
+                                        </div>
+                                    ) : (
+                                        <select 
+                                            value={promoteForm.nextClass} 
+                                            onChange={(e) => setPromoteForm({...promoteForm, nextClass: e.target.value})} 
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono font-bold"
+                                        >
+                                            {['Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'].map(c => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">Target Academic Session *</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        value={promoteForm.academicSession} 
+                                        onChange={(e) => setPromoteForm({...promoteForm, academicSession: e.target.value})} 
+                                        placeholder="2025-2026" 
+                                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                                    />
+                                </div>
+                                {!student?.currentClass?.includes('12') ? (
+                                    <div>
+                                        <label className="block font-semibold text-slate-700 mb-1">Assigned Section</label>
+                                        <select 
+                                            value={promoteForm.section} 
+                                            onChange={(e) => setPromoteForm({...promoteForm, section: e.target.value})} 
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                                        >
+                                            <option value="A">Section A</option>
+                                            <option value="B">Section B</option>
+                                            <option value="C">Section C</option>
+                                            <option value="D">Section D</option>
+                                        </select>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block font-semibold text-slate-700 mb-1">Moral Conduct & Character *</label>
+                                        <select 
+                                            value={promoteForm.conduct} 
+                                            onChange={(e) => setPromoteForm({...promoteForm, conduct: e.target.value})} 
+                                            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2"
+                                        >
+                                            <option value="Excellent">Excellent</option>
+                                            <option value="Very Good">Very Good</option>
+                                            <option value="Good">Good / Satisfactory</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Stream selection for 11 & 12 */}
+                            {!student?.currentClass?.includes('12') && ['Class 11', 'Class 12'].includes(promoteForm.nextClass) && (
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">Academic Stream</label>
+                                    <select 
+                                        value={promoteForm.stream} 
+                                        onChange={(e) => setPromoteForm({...promoteForm, stream: e.target.value})} 
+                                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-medium"
+                                    >
+                                        <option value="Science (PCM)">Science (PCM - Physics, Chemistry, Math)</option>
+                                        <option value="Science (PCB)">Science (PCB - Physics, Chemistry, Biology)</option>
+                                        <option value="Commerce">Commerce (Accounts, Economics, Business Studies)</option>
+                                        <option value="Arts">Humanities / Arts</option>
+                                        <option value="General">General</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block font-semibold text-slate-700 mb-1">
+                                    {student?.currentClass?.includes('12') ? 'Graduation & TC Discharge Remarks *' : 'Promotion Assessment Remarks'}
+                                </label>
+                                <textarea 
+                                    rows={3} 
+                                    required={student?.currentClass?.includes('12')}
+                                    value={promoteForm.remarks} 
+                                    onChange={(e) => setPromoteForm({...promoteForm, remarks: e.target.value})} 
+                                    placeholder="Enter examination board / desk verification notes..." 
+                                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs"
+                                />
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                                <button type="button" onClick={() => setShowPromoteModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl cursor-pointer">
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className={`px-5 py-2 text-white font-bold rounded-xl cursor-pointer flex items-center gap-1.5 ${
+                                        student?.currentClass?.includes('12') ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                                    }`}
+                                >
+                                    {student?.currentClass?.includes('12') ? (
+                                        <>
+                                            <GraduationCap size={16} /> Certify Class 12 Passed & Issue TC
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ArrowUpRight size={16} /> Certify Promotion
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </form>

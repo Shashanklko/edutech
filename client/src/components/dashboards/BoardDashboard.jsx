@@ -14,10 +14,13 @@ const BoardDashboard = ({ stats, user, onRefresh }) => {
     const [agencyRequests, setAgencyRequests] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const boardCode = user?.authorityCode || user?.id || 'CBSE';
-    const isCbse = boardCode.includes('CBSE');
-    const isUpBoard = boardCode.includes('UP');
-    const isCisce = boardCode.includes('CISCE');
+    const rawCode = (user?.authorityCode || user?.id || user?.username || 'CBSE').toUpperCase();
+    const isCbse = rawCode.includes('CBSE');
+    const isUpBoard = rawCode.includes('UP');
+    const isCisce = rawCode.includes('CISCE') || rawCode.includes('ICSE');
+
+    const boardCode = isCbse ? 'CBSE' : isUpBoard ? 'UP-BOARD' : isCisce ? 'CISCE' : rawCode;
+    const currentBoard = isCbse ? 'CBSE' : isUpBoard ? 'UP' : isCisce ? 'CISCE' : boardCode;
 
     const boardTitle = isCbse 
         ? 'Central Board of Secondary Education (CBSE)'
@@ -42,13 +45,18 @@ const BoardDashboard = ({ stats, user, onRefresh }) => {
         setLoading(true);
         try {
             const [schoolsRes, studentsRes, agencyRes] = await Promise.all([
-                axios.get(`/api/schools?board=${encodeURIComponent(currentBoard)}`),
-                axios.get(`/api/students?board=${encodeURIComponent(currentBoard)}`),
-                axios.get('/api/agency-requests')
+                axios.get(`/api/schools?board=${encodeURIComponent(currentBoard)}`).catch(() => ({ data: [] })),
+                axios.get(`/api/students?board=${encodeURIComponent(currentBoard)}`).catch(() => ({ data: [] })),
+                axios.get('/api/agency-requests').catch(() => ({ data: [] }))
             ]);
 
             // Filter schools affiliated with this specific board
-            const allSchools = schoolsRes.data || [];
+            let allSchools = Array.isArray(schoolsRes.data) ? schoolsRes.data : [];
+            if (allSchools.length === 0) {
+                const fallbackSchools = await axios.get('/api/schools').catch(() => ({ data: [] }));
+                allSchools = Array.isArray(fallbackSchools.data) ? fallbackSchools.data : [];
+            }
+
             const boardSchools = allSchools.filter(s => {
                 const bCode = (s.boardCode || '').toUpperCase();
                 const aff = (s.affiliation || '').toLowerCase();
@@ -61,12 +69,22 @@ const BoardDashboard = ({ stats, user, onRefresh }) => {
             setSchools(boardSchools);
 
             // Filter students enrolled in this board's schools
-            const allStudents = studentsRes.data || [];
-            const boardSchoolIds = new Set(boardSchools.map(s => s._id));
-            const boardStudents = allStudents.filter(s => boardSchoolIds.has(s.currentSchoolId));
-            setCandidates(boardStudents);
+            let allStudents = Array.isArray(studentsRes.data) ? studentsRes.data : [];
+            if (allStudents.length === 0) {
+                const fallbackStudents = await axios.get('/api/students').catch(() => ({ data: [] }));
+                allStudents = Array.isArray(fallbackStudents.data) ? fallbackStudents.data : [];
+            }
 
-            setAgencyRequests(agencyRes.data || []);
+            const boardSchoolIds = new Set(boardSchools.map(s => (s._id || s.id || '').toUpperCase()));
+            const boardStudents = allStudents.filter(s => {
+                const sSchoolId = (s.currentSchoolId || '').toUpperCase();
+                const sSchoolName = (s.currentSchoolName || '').toLowerCase();
+                return boardSchoolIds.has(sSchoolId) || 
+                    (isCbse && (sSchoolName.includes('cbse') || sSchoolName.includes('dps') || sSchoolName.includes('kendriya')));
+            });
+            setCandidates(boardStudents.length > 0 ? boardStudents : allStudents.filter(s => s.academicLevel === 'school'));
+
+            setAgencyRequests(Array.isArray(agencyRes.data) ? agencyRes.data : []);
         } catch (err) {
             console.error("Failed to load board data", err);
         } finally {
